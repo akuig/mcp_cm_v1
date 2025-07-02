@@ -1,9 +1,25 @@
--- Database initialization script for Telecom Catalog Demo
+#!/bin/bash
+# Reset and initialize the database
 
--- Use the database
-\c telecom_catalog;
+echo "Resetting database..."
 
--- Create tables if not exists
+# Stop services
+docker-compose down
+
+# Remove old data
+docker volume rm mcp_cm_v1_postgres_data 2>/dev/null || true
+
+# Start only postgres
+docker-compose up -d postgres
+
+# Wait for postgres to be ready
+echo "Waiting for PostgreSQL to start..."
+sleep 10
+
+# Initialize the database directly
+echo "Creating tables and inserting demo data..."
+docker exec -i telecom_postgres psql -U telecom_user -d telecom_catalog << 'EOF'
+-- Create tables
 CREATE TABLE IF NOT EXISTS customers (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
@@ -61,15 +77,13 @@ CREATE TABLE IF NOT EXISTS activation_addresses (
 );
 
 -- Insert demo data
-
--- Customers
 INSERT INTO customers (id, name, account_status, credit_score, has_overdue_payments) VALUES
 ('8452934', 'Jane Doe', 'active', 720, false),
 ('8452935', 'John Smith', 'active', 650, true),
 ('8452936', 'Alice Johnson', 'active', 780, false),
-('8452937', 'Bob Williams', 'suspended', 550, true);
+('8452937', 'Bob Williams', 'suspended', 550, true)
+ON CONFLICT (id) DO NOTHING;
 
--- Service Coverage
 INSERT INTO service_coverage (street_name, city, service_type, max_speed_mbps) VALUES
 ('Main Street', 'Springfield', 'fiber', 1000),
 ('Oak Avenue', 'Springfield', 'fiber', 1000),
@@ -78,8 +92,19 @@ INSERT INTO service_coverage (street_name, city, service_type, max_speed_mbps) V
 ('Maple Drive', 'Springfield', 'fiber', 500),
 ('Cherry Lane', 'Shelbyville', 'cable', 100);
 
--- Create indexes for performance
-CREATE INDEX idx_customers_status ON customers(account_status);
-CREATE INDEX idx_coverage_location ON service_coverage(street_name, city);
-CREATE INDEX idx_orders_customer ON orders(customer_id);
-CREATE INDEX idx_orders_status ON orders(status);
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(account_status);
+CREATE INDEX IF NOT EXISTS idx_coverage_location ON service_coverage(street_name, city);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+-- Verify data
+SELECT COUNT(*) as customer_count FROM customers;
+SELECT COUNT(*) as coverage_count FROM service_coverage;
+EOF
+
+echo ""
+echo "✅ Database initialized successfully!"
+echo ""
+echo "Now start all services:"
+echo "docker-compose up -d"

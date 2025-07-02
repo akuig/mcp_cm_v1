@@ -13,14 +13,31 @@ make up
 make health
 ```
 
-3. Connect MCP Inspector to the server:
+3. Test the MCP server:
 ```bash
-# In one terminal, get the MCP server stdio interface
-docker exec -it mcp_server python mcp_server.py
+# Option 1: Use MCP Inspector (recommended for interactive testing)
+make inspector
 
-# In another terminal, run the inspector
-npx @anthropic/mcp-inspector
+# Option 2: Run automated tests
+python test_mcp.py
+
+# Option 3: Test with curl
+make test-curl
 ```
+
+## Using MCP Inspector
+
+The MCP Inspector can be used with the HTTP streaming server through a bridge:
+
+1. Make sure services are running: `make up`
+2. Run: `make inspector`
+3. The Inspector will open with access to all tools:
+   - `service_qualification` - Check service availability
+   - `customer_management` - Look up customer information
+   - `product_ordering` - Create orders
+   - `service_activation` - Activate services
+
+The bridge (`mcp_bridge.py`) translates between the Inspector's stdio interface and the HTTP streaming server.
 
 ## Test Scenarios
 
@@ -174,6 +191,15 @@ Tool: `service_qualification`
 
 ## Verification Commands
 
+Check service health:
+```bash
+# Check all services
+make health
+
+# Test MCP endpoints directly
+curl http://localhost:8090/health
+```
+
 Check database state after tests:
 ```bash
 # Connect to database
@@ -194,6 +220,60 @@ SELECT * FROM service_activations;
 # Exit
 \q
 ```
+
+## Testing with HTTP Streaming Client
+
+You can test the MCP server directly with curl:
+
+```bash
+# Initialize MCP connection
+curl -X POST http://localhost:8090/mcp/stream \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "params": {},
+    "id": 1
+  }'
+
+# List available tools
+curl -X POST http://localhost:8090/mcp/stream \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "params": {},
+    "id": 2
+  }'
+
+# Call a tool (service qualification)
+curl -X POST http://localhost:8090/mcp/stream \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "service_qualification",
+      "arguments": {
+        "address": {
+          "streetName": "Main Street",
+          "streetNumber": "123",
+          "city": "Springfield"
+        },
+        "serviceSpecification": {
+          "id": "fiber500",
+          "name": "Fiber 500 Mbps Plan"
+        }
+      }
+    },
+    "id": 3
+  }'
+```
+
+The responses will be streamed back using chunked transfer encoding.
 
 ## Error Scenarios to Test
 

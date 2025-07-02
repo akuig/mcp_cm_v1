@@ -1,0 +1,2 @@
+# Python dependencies for local testing
+aiohttp>=3.9.0

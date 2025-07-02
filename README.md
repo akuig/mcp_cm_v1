@@ -15,8 +15,8 @@ This MVP focuses on the Catalog Manager system, implementing:
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   AI Agent      │────▶│   MCP Server    │────▶│ Catalog Manager │
-│ (MCP Inspector) │ MCP │                 │ HTTP│  (TM Forum APIs)│
-└─────────────────┘     └─────────────────┘     └────────┬────────┘
+│ (MCP Client)    │HTTP │   (Port 8090)   │ HTTP│  (TM Forum APIs)│
+└─────────────────┘Stream└─────────────────┘     └────────┬────────┘
                                                           │
                                                           ▼
                                                  ┌─────────────────┐
@@ -25,50 +25,93 @@ This MVP focuses on the Catalog Manager system, implementing:
                                                  └─────────────────┘
 ```
 
+The MCP Server uses HTTP streaming (chunked transfer encoding) for real-time communication.
+
 ## Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.11+
-- Node.js (for MCP Inspector)
+- Python 3.8+ with pip
+- Node.js (optional, for MCP Inspector)
+- curl and jq (for testing)
 
 ### Installation & Running
 
 1. Clone the repository and navigate to the project directory
 
-2. Build and start all services:
+2. Run the setup script:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+3. Build and start all services:
 ```bash
 make build
 make up
 ```
 
-3. Verify services are running:
+4. Verify services are running:
 ```bash
 make health
 ```
 
-4. Run automated tests:
+5. Run automated tests:
 ```bash
+make test-mcp
+```
+
+### Alternative: Using Python Virtual Environment
+
+For isolated testing:
+```bash
+# Create virtual environment
+make venv
+
+# Activate it
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements_test.txt
+
+# Run tests
 python test_mcp.py
 ```
 
-### Using MCP Inspector
+### Using MCP with HTTP Streaming
 
-1. Install MCP Inspector:
+The MCP server uses HTTP streaming (chunked transfer encoding) for real-time communication.
+
+#### Option 1: Using MCP Inspector
+
+A bridge is provided to use MCP Inspector with the HTTP streaming server:
+
 ```bash
-npm install -g @anthropic/mcp-inspector
+# Install and run MCP Inspector with the bridge
+make inspector
 ```
 
-2. Connect to the MCP server:
-```bash
-# In one terminal
-docker exec -it mcp_server python mcp_server.py
+This will:
+1. Start a bridge that translates between stdio (for Inspector) and HTTP streaming
+2. Launch MCP Inspector connected to the bridge
+3. Allow you to interact with all MCP tools through the Inspector UI
 
-# In another terminal
-mcp-inspector
+#### Option 2: Direct HTTP Testing
+
+```bash
+# Test with curl
+curl -X POST http://localhost:8090/mcp/stream \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json-stream" \
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}'
 ```
 
-3. Follow the test scenarios in `test_scenarios.md`
+### MCP Server Endpoints
+
+The MCP server uses HTTP streaming transport with the following endpoints:
+- **Streaming endpoint**: `http://localhost:8090/mcp/stream` - For MCP client connections (chunked HTTP)
+- **Legacy endpoint**: `http://localhost:8090/messages` - For compatibility
+- **Health check**: `http://localhost:8090/health` - Service health status
 
 ## Available MCP Tools
 
