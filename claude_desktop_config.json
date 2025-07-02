@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "telepath-mcp": {
-      "url": "http://localhost:8090/sse"
+      "url": "http://localhost:8090"
     }
   }
 }

@@ -32,7 +32,9 @@ npx @anthropic/mcp-inspector stdio
 
 ## Using with Claude Desktop
 
-1. First, ensure the server is running:
+The server now uses FastMCP with HTTP streaming transport, which is compatible with Claude Desktop.
+
+1. First, ensure the HTTP server is running:
 ```bash
 make up
 ```
@@ -46,7 +48,7 @@ Add this server configuration:
 {
   "mcpServers": {
     "telepath-mcp": {
-      "url": "http://localhost:8090/sse"
+      "url": "http://localhost:8090"
     }
   }
 }
@@ -61,6 +63,19 @@ Add this server configuration:
    - **customer_management** - Look up customer information
    - **product_ordering** - Create product orders
    - **service_activation** - Activate services
+
+### Remote Server Support
+
+Since the server uses HTTP, you can also connect to a remote server:
+```json
+{
+  "mcpServers": {
+    "telepath-mcp": {
+      "url": "http://your-server-ip:8090"
+    }
+  }
+}
+```
 
 ## Testing the Server
 

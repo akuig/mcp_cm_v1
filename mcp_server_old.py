@@ -400,6 +400,8 @@ class TelecomMCPServer:
         # SSE endpoints for Claude Desktop
         app.router.add_get('/sse', self.handle_sse)
         app.router.add_post('/sse', self.handle_message)
+        app.router.add_get('/mcp/sse', self.handle_sse)
+        app.router.add_post('/mcp/sse', self.handle_message)
         
         # Streaming endpoints
         app.router.add_post('/mcp/stream', self.handle_stream)
@@ -412,6 +414,10 @@ class TelecomMCPServer:
         # Health check
         app.router.add_get('/health', self.health_check)
         
+        # Handle 404s for OAuth endpoints Claude Desktop might probe
+        app.router.add_get('/.well-known/oauth-authorization-server', self.handle_not_found)
+        app.router.add_post('/register', self.handle_not_found)
+        
         try:
             runner = web.AppRunner(app)
             await runner.setup()
@@ -419,7 +425,7 @@ class TelecomMCPServer:
             await site.start()
             
             logger.info("Telepath MCP Server started on http://0.0.0.0:8090")
-            logger.info("SSE endpoint: http://0.0.0.0:8090/sse")
+            logger.info("SSE endpoints: http://0.0.0.0:8090/sse and http://0.0.0.0:8090/mcp/sse")
             logger.info("Streaming endpoint: http://0.0.0.0:8090/mcp/stream")
             logger.info("Health check: http://0.0.0.0:8090/health")
             
@@ -428,6 +434,10 @@ class TelecomMCPServer:
         finally:
             await self.cleanup()
             await runner.cleanup()
+    
+    async def handle_not_found(self, request):
+        """Handle requests to endpoints we don't support"""
+        return web.Response(status=404, text="Not Found")
 
 if __name__ == "__main__":
     server = TelecomMCPServer()

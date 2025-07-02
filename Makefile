@@ -57,22 +57,17 @@ test-curl:
 		-H "Accept: application/json-stream" \
 		-d '{"jsonrpc": "2.0", "method": "initialize", "params": {}, "id": 2}' | jq .
 
-# Run MCP Inspector with bridge
+# Run MCP Inspector
 inspector:
-	@echo "Starting MCP Inspector with HTTP streaming bridge..."
+	@echo "Starting MCP Inspector..."
 	@echo "Make sure services are running (make up)"
 	@echo ""
 	@if ! command -v mcp-inspector > /dev/null; then \
 		echo "Installing MCP Inspector..."; \
 		npm install -g @anthropic/mcp-inspector; \
 	fi
-	@echo "Starting bridge in background..."
-	@python mcp_bridge.py &
-	@BRIDGE_PID=$$!; \
-	sleep 2; \
-	echo "Starting MCP Inspector..."; \
-	mcp-inspector stdio; \
-	kill $$BRIDGE_PID 2>/dev/null || true
+	@echo "Connecting to http://localhost:8090"
+	mcp-inspector http://localhost:8090
 
 # Individual service commands
 postgres:

@@ -5,10 +5,17 @@ A demonstration system for the Telepath AI project that exposes telecommunicatio
 ## Overview
 
 This MVP focuses on the Catalog Manager system, implementing:
-- MCP Server wrapping TM Forum APIs (TMF622, TMF629, TMF637, TMF640)
+- MCP Server using FastMCP with HTTP streaming transport (compatible with Claude Desktop)
 - Mock Catalog Manager implementing the TM Forum APIs
 - PostgreSQL database with demo customer and service data
 - Complete Docker-based deployment
+
+## Key Features
+
+- **HTTP Streaming Transport**: The server uses FastMCP's streamable-http transport, allowing it to work with both Claude Desktop and remote deployments
+- **TM Forum API Integration**: Wraps TMF622, TMF629, TMF637, and TMF640 APIs
+- **Full Audit Logging**: All operations are logged for compliance
+- **Docker Deployment**: Easy deployment with docker-compose
 
 ## Architecture
 
@@ -80,23 +87,34 @@ python test_mcp.py
 
 ### Using MCP with HTTP Streaming
 
-The MCP server uses HTTP streaming (chunked transfer encoding) for real-time communication.
+The MCP server uses FastMCP with HTTP streaming transport for real-time communication.
 
-#### Option 1: Using MCP Inspector
+#### Option 1: Using Claude Desktop
 
-A bridge is provided to use MCP Inspector with the HTTP streaming server:
+Add to Claude Desktop configuration:
+- On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "telepath-mcp": {
+      "url": "http://localhost:8090"
+    }
+  }
+}
+```
+
+Restart Claude Desktop and you'll see "telepath-mcp" in the servers list.
+
+#### Option 2: Using MCP Inspector
 
 ```bash
-# Install and run MCP Inspector with the bridge
+# The server works directly with MCP Inspector
 make inspector
 ```
 
-This will:
-1. Start a bridge that translates between stdio (for Inspector) and HTTP streaming
-2. Launch MCP Inspector connected to the bridge
-3. Allow you to interact with all MCP tools through the Inspector UI
-
-#### Option 2: Direct HTTP Testing
+#### Option 3: Direct HTTP Testing
 
 ```bash
 # Test with curl

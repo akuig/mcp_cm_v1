@@ -14,14 +14,14 @@ COPY requirements_mcp.txt .
 RUN pip install --no-cache-dir -r requirements_mcp.txt
 
 # Copy application code
-COPY mcp_server.py .
+COPY mcp_fastmcp_server.py .
 
 # Create non-root user
 RUN useradd -m -u 1000 mcpuser && chown -R mcpuser:mcpuser /app
 USER mcpuser
 
-# Expose MCP server port (stdio mode)
+# Expose MCP server port
 EXPOSE 8090
 
 # Run the MCP server
-CMD ["python", "-u", "mcp_server.py"]
+CMD ["python", "-u", "mcp_fastmcp_server.py"]
