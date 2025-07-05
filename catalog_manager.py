@@ -110,7 +110,13 @@ def get_customer(customer_id):
                 "name": customer['name'],
                 "accountStatus": customer['account_status'],
                 "creditScore": customer['credit_score'],
-                "hasOverduePayments": customer['has_overdue_payments']
+                "hasOverduePayments": customer['has_overdue_payments'],
+                "address": {
+                    "streetNumber": customer['street_number'],
+                    "streetName": customer['street_name'],
+                    "city": customer['city'],
+                    "postalCode": customer['postal_code']
+                }
             }
             return jsonify(result)
         else:

@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS customers (
     account_status VARCHAR(50) NOT NULL,
     credit_score INTEGER,
     has_overdue_payments BOOLEAN DEFAULT FALSE,
+    street_number VARCHAR(20),
+    street_name VARCHAR(200),
+    city VARCHAR(100),
+    postal_code VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -63,11 +67,11 @@ CREATE TABLE IF NOT EXISTS activation_addresses (
 -- Insert demo data
 
 -- Customers
-INSERT INTO customers (id, name, account_status, credit_score, has_overdue_payments) VALUES
-('8452934', 'Jane Doe', 'active', 720, false),
-('8452935', 'John Smith', 'active', 650, true),
-('8452936', 'Alice Johnson', 'active', 780, false),
-('8452937', 'Bob Williams', 'suspended', 550, true);
+INSERT INTO customers (id, name, account_status, credit_score, has_overdue_payments, street_number, street_name, city, postal_code) VALUES
+('8452934', 'Jane Doe', 'active', 720, false, '456', 'Main Street', 'Springfield', '01101'),
+('8452935', 'John Smith', 'active', 650, true, '123', 'Main Street', 'Springfield', '01101'),
+('8452936', 'Alice Johnson', 'active', 780, false, '789', 'Oak Avenue', 'Springfield', '01102'),
+('8452937', 'Bob Williams', 'suspended', 550, true, '321', 'Elm Street', 'Springfield', '01103');
 
 -- Service Coverage
 INSERT INTO service_coverage (street_name, city, service_type, max_speed_mbps) VALUES
