@@ -49,13 +49,33 @@ def service_qualification():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if we have fiber coverage at this location
+        # First, get the service type from specifications
+        cursor.execute("""
+            SELECT service_type FROM service_specifications 
+            WHERE id = %s
+        """, (service_spec.get('id'),))
+        
+        spec_result = cursor.fetchone()
+        if not spec_result:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "serviceQualificationItem": [{
+                    "qualificationResult": "unqualified",
+                    "productOffering": service_spec,
+                    "reason": "Invalid service specification"
+                }]
+            })
+        
+        service_type = spec_result['service_type']
+        
+        # Check if we have coverage for this service type at this location
         cursor.execute("""
             SELECT * FROM service_coverage 
             WHERE street_name = %s 
             AND city = %s 
-            AND service_type = 'fiber'
-        """, (address.get('streetName'), address.get('city')))
+            AND service_type = %s
+        """, (address.get('streetName'), address.get('city'), service_type))
         
         coverage = cursor.fetchone()
         cursor.close()
