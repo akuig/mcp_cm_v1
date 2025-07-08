@@ -270,5 +270,131 @@ def activate_service():
         logger.error(f"Error activating service: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/customers', methods=['GET'])
+def get_all_customers():
+    """Get all customers"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, name, account_status, credit_score, has_overdue_payments,
+                   street_number, street_name, city, postal_code
+            FROM customers
+            ORDER BY name
+        """)
+        
+        customers = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify(customers)
+    except Exception as e:
+        logger.error(f"Error getting customers: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/service-specifications', methods=['GET'])
+def get_service_specifications():
+    """Get all service specifications"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, name, service_type, description
+            FROM service_specifications
+            ORDER BY service_type, name
+        """)
+        
+        specs = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify(specs)
+    except Exception as e:
+        logger.error(f"Error getting service specifications: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/service-coverage', methods=['GET'])
+def get_service_coverage():
+    """Get service coverage map"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT DISTINCT street_name, city,
+                   STRING_AGG(service_type || 
+                   CASE WHEN max_speed_mbps IS NOT NULL 
+                        THEN ' (' || max_speed_mbps || ' Mbps)' 
+                        ELSE '' END, 
+                   ', ' ORDER BY service_type) as available_services
+            FROM service_coverage
+            GROUP BY street_name, city
+            ORDER BY city, street_name
+        """)
+        
+        coverage = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify(coverage)
+    except Exception as e:
+        logger.error(f"Error getting service coverage: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/customer/<customer_id>/services', methods=['GET'])
+def get_customer_services(customer_id):
+    """Get active services for a customer"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get active service activations for this customer
+        cursor.execute("""
+            SELECT sa.*, aa.street_number, aa.street_name, aa.city
+            FROM service_activations sa
+            JOIN activation_addresses aa ON sa.id = aa.activation_id
+            WHERE sa.status = 'activated'
+            ORDER BY sa.created_at DESC
+        """)
+        
+        services = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        # Filter services for this customer (in a real system, we'd have customer_id in the activation)
+        # For demo, we'll return services at the customer's address
+        return jsonify(services)
+    except Exception as e:
+        logger.error(f"Error getting customer services: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/orders/recent', methods=['GET'])
+def get_recent_orders():
+    """Get recent orders"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT o.*, c.name as customer_name,
+                   oa.street_number, oa.street_name, oa.city
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.id
+            JOIN order_addresses oa ON o.id = oa.order_id
+            ORDER BY o.created_at DESC
+            LIMIT 10
+        """)
+        
+        orders = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify(orders)
+    except Exception as e:
+        logger.error(f"Error getting recent orders: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

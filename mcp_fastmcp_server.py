@@ -6,6 +6,7 @@ MCP Server for Telepath AI - Uses FastMCP for HTTP streaming
 import os
 import logging
 import asyncio
+import json
 import aiohttp
 from typing import Dict, Any
 from mcp.server.fastmcp import FastMCP
@@ -51,6 +52,78 @@ def log_audit(action: str, request: Dict, response: Dict):
         "status": "Success" if "error" not in response else "Failed"
     }
     logger.info(f"Audit: {audit_entry}")
+
+# Resources for browsing data
+@mcp.resource("customers://list")
+async def list_customers() -> str:
+    """Get a list of all customers with their details"""
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/api/customers"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        customers = await response.json()
+        return json.dumps(customers, indent=2)
+
+@mcp.resource("services://catalog")
+async def get_service_catalog() -> str:
+    """Get the complete service catalog with all available services"""
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/api/service-specifications"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        services = await response.json()
+        # Group by service type for better readability
+        grouped = {}
+        for service in services:
+            service_type = service['service_type']
+            if service_type not in grouped:
+                grouped[service_type] = []
+            grouped[service_type].append(service)
+        return json.dumps(grouped, indent=2)
+
+@mcp.resource("coverage://map")
+async def get_coverage_map() -> str:
+    """Get service coverage by location showing what services are available where"""
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/api/service-coverage"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        coverage = await response.json()
+        return json.dumps(coverage, indent=2)
+
+@mcp.resource("customer://{customer_id}")
+async def get_customer_details(customer_id: str) -> str:
+    """Get detailed information about a specific customer including their services"""
+    await ensure_session()
+    
+    # Get customer info
+    url = f"{CATALOG_MANAGER_URL}/tmf629/customer/{customer_id}"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        if response.status == 404:
+            return json.dumps({"error": "Customer not found"}, indent=2)
+        customer = await response.json()
+        
+    # Get active services for this customer
+    services_url = f"{CATALOG_MANAGER_URL}/api/customer/{customer_id}/services"
+    async with session.get(services_url, timeout=DEFAULT_TIMEOUT) as response:
+        services = await response.json()
+        
+    return json.dumps({
+        "customer": customer,
+        "active_services": services
+    }, indent=2)
+
+@mcp.resource("orders://recent")
+async def get_recent_orders() -> str:
+    """Get recent orders from the system showing latest customer activity"""
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/api/orders/recent"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        orders = await response.json()
+        return json.dumps(orders, indent=2)
+
+# Tools for performing actions
 
 @mcp.tool()
 async def service_qualification(
