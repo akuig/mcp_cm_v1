@@ -76,9 +76,6 @@ postgres:
 catalog:
 	docker-compose up -d catalog-manager
 
-fault:
-	docker-compose up -d fault-manager
-
 mcp:
 	docker-compose up -d mcp-server
 
@@ -87,8 +84,6 @@ health:
 	@echo "Checking service health..."
 	@echo "Catalog Manager:"
 	@curl -s http://localhost:8080/health | jq . || echo "Catalog Manager not healthy"
-	@echo "\nFault Manager:"
-	@curl -s http://localhost:8081/health | jq . || echo "Fault Manager not healthy"
 	@echo "\nMCP Server:"
 	@curl -s http://localhost:8090/health | jq . || echo "MCP Server not healthy"
 	@echo "\nContainer status:"
@@ -102,16 +97,3 @@ db-shell:
 reset-db:
 	@chmod +x reset_db.sh
 	./reset_db.sh
-
-# Simulate fiber outage
-simulate-outage:
-	@echo "Simulating fiber outage on Main Street..."
-	@chmod +x simulate_outage.sh
-	./simulate_outage.sh
-
-# Check fault manager health
-fault-health:
-	@echo "Checking Fault Manager..."
-	@curl -s http://localhost:8081/health | jq .
-	@echo "\nCurrent alarms:"
-	@curl -s http://localhost:8081/tmf656/alarmManagement/alarms | jq .

@@ -45,54 +45,6 @@ services:
     networks:
       - telecom_network
 
-  fault-manager:
-    build:
-      context: .
-      dockerfile: Dockerfile.fault
-    container_name: fault_manager
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: telecom_catalog
-      DB_USER: telecom_user
-      DB_PASSWORD: telecom_pass
-    ports:
-      - "8081:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - telecom_network
-
-  fault-manager:
-    build:
-      context: .
-      dockerfile: Dockerfile.fault
-    container_name: fault_manager
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: telecom_catalog
-      DB_USER: telecom_user
-      DB_PASSWORD: telecom_pass
-    ports:
-      - "8081:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - telecom_network
-
   mcp-server:
     build:
       context: .
@@ -100,7 +52,6 @@ services:
     container_name: mcp_server
     environment:
       CATALOG_MANAGER_URL: http://catalog-manager:8080
-      FAULT_MANAGER_URL: http://fault-manager:8081
     ports:
       - "8090:8090"
     depends_on:
