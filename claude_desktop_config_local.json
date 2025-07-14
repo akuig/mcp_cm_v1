@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "telepath-fault-local": {
+      "command": "python3",
+      "args": [
+        "/Users/joe/dev/mcp_cm_v1/mcp_local_bridge.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/joe/dev/mcp_cm_v1"
+      },
+      "description": "Telepath AI MCP Server with Fault Management (Local)"
+    }
+  }
+}

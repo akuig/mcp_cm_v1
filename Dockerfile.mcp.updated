@@ -16,12 +16,6 @@ RUN pip install --no-cache-dir -r requirements_mcp.txt
 # Copy all MCP server files
 COPY mcp_fastmcp_server.py .
 COPY mcp_fastmcp_server_with_fault.py .
-COPY mcp_fastmcp_server_fault_simple.py .
-COPY mcp_stdio_server_fault.py .
-COPY mcp_http_streaming_server.py .
-COPY mcp_simple_http_server.py .
-COPY mcp_working_http_server.py .
-COPY mcp_fastmcp_all_tools.py .
 
 # Create non-root user
 RUN useradd -m -u 1000 mcpuser && chown -R mcpuser:mcpuser /app
@@ -30,5 +24,5 @@ USER mcpuser
 # Expose MCP server port
 EXPOSE 8090
 
-# Default to original server, but allow override
+# Default to original server, but allow override via command
 CMD ["python", "-u", "mcp_fastmcp_server.py"]

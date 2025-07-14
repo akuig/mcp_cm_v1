@@ -1,0 +1,22 @@
+#!/bin/bash
+# Quick commands to get everything working
+
+echo "🚀 Fault Management Demo - Quick Commands"
+echo "========================================"
+echo ""
+echo "Run these commands in order:"
+echo ""
+echo "1. Make scripts executable:"
+echo "   chmod +x final_fix_asyncio.sh"
+echo ""
+echo "2. Apply all fixes and start services:"
+echo "   ./final_fix_asyncio.sh"
+echo ""
+echo "3. Wait about 30 seconds for services to start"
+echo ""
+echo "4. Run the demo:"
+echo "   python test_fault_management.py"
+echo ""
+echo "That's it! The demo should work perfectly."
+echo ""
+echo "📝 For troubleshooting, see ALL_FIXES_COMPLETE.md"

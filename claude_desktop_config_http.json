@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "telepath-fault-http": {
+      "url": "http://localhost:8090/mcp",
+      "description": "Telepath AI MCP Server with Fault Management (HTTP Streaming)",
+      "metadata": {
+        "transport": "http",
+        "tools": [
+          "service_qualification",
+          "customer_management",
+          "product_ordering",
+          "service_activation",
+          "check_service_status",
+          "create_trouble_ticket",
+          "execute_remedial_action",
+          "get_service_problems"
+        ]
+      }
+    }
+  }
+}
