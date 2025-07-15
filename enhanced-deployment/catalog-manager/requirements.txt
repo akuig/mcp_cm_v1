@@ -1,0 +1,70 @@
+# Catalog Manager Python Dependencies
+# Core web framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Database connectivity
+mysql-connector-python==8.2.0
+PyMySQL==1.1.0
+
+# Caching
+redis==5.0.1
+
+# HTTP client for external APIs
+requests==2.31.0
+aiohttp==3.9.1
+
+# JSON handling and validation
+jsonschema==4.20.0
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Date/time handling
+python-dateutil==2.8.2
+
+# Environment variable management
+python-dotenv==1.0.0
+
+# CORS support
+Flask-CORS==4.0.0
+
+# API documentation
+flask-restx==1.3.0
+
+# Async support
+asyncio-extensions==0.1.0
+
+# UUID generation
+uuid==1.30
+
+# Configuration management
+pyyaml==6.0.1
+
+# Testing (for development)
+pytest==7.4.3
+pytest-flask==1.3.0
+pytest-mock==3.12.0
+
+# Development tools
+black==23.11.0
+flake8==6.1.0
+isort==5.12.0
+
+# Production server
+gunicorn==21.2.0
+
+# Monitoring and metrics
+prometheus-client==0.19.0
+
+# Security
+cryptography==41.0.8
+
+# Data validation
+marshmallow==3.20.1
+
+# Rate limiting
+Flask-Limiter==3.5.0
+
+# Caching decorator
+cachetools==5.3.2
