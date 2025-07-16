@@ -1,545 +1,363 @@
 #!/usr/bin/env python3
 """
-MCP Server for Telepath AI - Exposes TM Forum APIs as MCP tools
-Enhanced with Catalog Management capabilities
+MCP Server for Telepath AI - Fixed version using FastMCP for HTTP streaming
 """
 
+import os
+import logging
 import asyncio
 import json
-import logging
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import aiohttp
-from mcp.server import Server
-from mcp.types import Tool, TextContent, ToolResult, ToolCallResult
+from typing import Dict, Any
+from mcp.server.fastmcp import FastMCP
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
+PORT = os.getenv("PORT", "8090")
+HOST = os.getenv("HOST", "0.0.0.0")
 CATALOG_MANAGER_URL = "http://catalog-manager:8080"
 DEFAULT_TIMEOUT = 30
 
-class TelecomMCPServer:
-    def __init__(self):
-        self.server = Server("telepath-mcp")
-        self.session: Optional[aiohttp.ClientSession] = None
-        
-        # Register existing customer-facing tools
-        self.server.add_tool(self.service_qualification_tool())
-        self.server.add_tool(self.customer_management_tool())
-        self.server.add_tool(self.product_ordering_tool())
-        self.server.add_tool(self.service_activation_tool())
-        
-        # Register new catalog management tools
-        self.server.add_tool(self.list_service_specifications_tool())
-        self.server.add_tool(self.list_product_offerings_tool())
-        self.server.add_tool(self.list_geographic_locations_tool())
-        self.server.add_tool(self.sync_catalog_data_tool())
-        self.server.add_tool(self.create_service_specification_tool())
-        self.server.add_tool(self.create_product_offering_tool())
-        self.server.add_tool(self.link_offering_to_specification_tool())
-        self.server.add_tool(self.add_geographic_coverage_tool())
-        
-        # Register handlers
-        self.server.set_call_tool_handler(self.handle_tool_call)
+# Create the MCP server
+mcp = FastMCP("telepath-mcp", port=PORT, host=HOST, debug=True, log_level="INFO")
+
+# Global session for HTTP requests
+session = None
+
+async def ensure_session():
+    """Ensure aiohttp session is created"""
+    global session
+    if session is None:
+        session = aiohttp.ClientSession()
+
+async def cleanup_session():
+    """Cleanup aiohttp session"""
+    global session
+    if session:
+        await session.close()
+        session = None
+
+def log_audit(action: str, request: Dict, response: Dict):
+    """Log audit trail for compliance"""
+    from datetime import datetime
+    audit_entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "correlationId": f"{action}-{datetime.utcnow().timestamp()}",
+        "action": action,
+        "requestPayload": request,
+        "responsePayload": response,
+        "status": "Success" if "error" not in response else "Failed"
+    }
+    logger.info(f"Audit: {audit_entry}")
+
+# Resources for browsing data
+@mcp.resource("customers://list")
+async def list_customers() -> str:
+    """Get a list of all customers with their details"""
+    await ensure_session()
     
-    # ===== EXISTING CUSTOMER-FACING TOOLS =====
+    url = f"{CATALOG_MANAGER_URL}/api/customers"
+    try:
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            customers = await response.json()
+            return json.dumps(customers, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch customers: {str(e)}"}, indent=2)
+
+@mcp.resource("services://catalog")
+async def get_service_catalog() -> str:
+    """Get the complete service catalog with all available services"""
+    await ensure_session()
     
-    def service_qualification_tool(self) -> Tool:
-        return Tool(
-            name="service_qualification",
-            description="Check if a service is available at a specific location (TMF637)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "address": {
-                        "type": "object",
-                        "properties": {
-                            "streetName": {"type": "string"},
-                            "streetNumber": {"type": "string"},
-                            "city": {"type": "string"}
-                        },
-                        "required": ["streetName", "streetNumber", "city"]
-                    },
-                    "serviceSpecification": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "string"},
-                            "name": {"type": "string"}
-                        },
-                        "required": ["id", "name"]
-                    }
-                },
-                "required": ["address", "serviceSpecification"]
-            }
-        )
+    url = f"{CATALOG_MANAGER_URL}/api/service-specifications"
+    try:
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            services = await response.json()
+            # Group by service type for better readability
+            grouped = {}
+            for service in services:
+                service_type = service.get('service_type', 'Unknown')
+                if service_type not in grouped:
+                    grouped[service_type] = []
+                grouped[service_type].append(service)
+            return json.dumps(grouped, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch service catalog: {str(e)}"}, indent=2)
+
+@mcp.resource("coverage://map")
+async def get_coverage_map() -> str:
+    """Get service coverage by location showing what services are available where"""
+    await ensure_session()
     
-    def customer_management_tool(self) -> Tool:
-        return Tool(
-            name="customer_management",
-            description="Get customer information including account status and eligibility (TMF629)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "customerId": {
-                        "type": "string",
-                        "description": "The customer ID to look up"
-                    }
-                },
-                "required": ["customerId"]
-            }
-        )
+    url = f"{CATALOG_MANAGER_URL}/api/service-coverage"
+    try:
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            coverage = await response.json()
+            return json.dumps(coverage, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch coverage map: {str(e)}"}, indent=2)
+
+@mcp.resource("customer://{customer_id}")
+async def get_customer_details(customer_id: str) -> str:
+    """Get detailed information about a specific customer including their services"""
+    await ensure_session()
     
-    def product_ordering_tool(self) -> Tool:
-        return Tool(
-            name="product_ordering",
-            description="Create a product order for a customer (TMF622)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "orderDate": {"type": "string"},
-                    "externalId": {"type": "string"},
-                    "customerId": {"type": "string"},
-                    "productOfferingId": {"type": "string"},
-                    "address": {
-                        "type": "object",
-                        "properties": {
-                            "streetName": {"type": "string"},
-                            "streetNumber": {"type": "string"},
-                            "city": {"type": "string"}
-                        }
-                    }
-                },
-                "required": ["orderDate", "externalId", "customerId", "productOfferingId", "address"]
-            }
-        )
-    
-    def service_activation_tool(self) -> Tool:
-        return Tool(
-            name="service_activation",
-            description="Activate a service in the network (TMF640)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "serviceName": {"type": "string"},
-                    "serviceType": {"type": "string"},
-                    "address": {
-                        "type": "object",
-                        "properties": {
-                            "streetName": {"type": "string"},
-                            "streetNumber": {"type": "string"},
-                            "city": {"type": "string"}
-                        }
-                    },
-                    "serviceSpecificationId": {"type": "string"}
-                },
-                "required": ["serviceName", "serviceType", "address", "serviceSpecificationId"]
-            }
-        )
-    
-    # ===== NEW CATALOG MANAGEMENT TOOLS =====
-    
-    def list_service_specifications_tool(self) -> Tool:
-        return Tool(
-            name="list_service_specifications",
-            description="List all available service specifications (TMF633)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Optional category filter (e.g., 'connectivity', 'voice', 'data')"
-                    }
-                }
-            }
-        )
-    
-    def list_product_offerings_tool(self) -> Tool:
-        return Tool(
-            name="list_product_offerings",
-            description="List all available product offerings (TMF620)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string", 
-                        "description": "Optional category filter"
-                    },
-                    "isBundle": {
-                        "type": "boolean",
-                        "description": "Filter for bundle vs individual offerings"
-                    }
-                }
-            }
-        )
-    
-    def list_geographic_locations_tool(self) -> Tool:
-        return Tool(
-            name="list_geographic_locations",
-            description="List geographic locations and their service coverage (TMF673)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "Optional city filter"
-                    },
-                    "serviceType": {
-                        "type": "string",
-                        "description": "Optional service type filter"
-                    }
-                }
-            }
-        )
-    
-    def sync_catalog_data_tool(self) -> Tool:
-        return Tool(
-            name="sync_catalog_data",
-            description="Synchronize and validate catalog data integrity",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "validateOnly": {
-                        "type": "boolean",
-                        "description": "If true, only validate without making changes",
-                        "default": True
-                    },
-                    "fixOrphans": {
-                        "type": "boolean", 
-                        "description": "If true, fix orphaned references",
-                        "default": False
-                    }
-                }
-            }
-        )
-    
-    def create_service_specification_tool(self) -> Tool:
-        return Tool(
-            name="create_service_specification",
-            description="Create a new service specification (TMF633)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "category": {"type": "string"},
-                    "serviceType": {"type": "string"},
-                    "characteristics": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "valueType": {"type": "string"},
-                                "defaultValue": {"type": "string"}
-                            }
-                        }
-                    }
-                },
-                "required": ["name", "description", "category", "serviceType"]
-            }
-        )
-    
-    def create_product_offering_tool(self) -> Tool:
-        return Tool(
-            name="create_product_offering",
-            description="Create a new product offering (TMF620)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "category": {"type": "string"},
-                    "isBundle": {"type": "boolean", "default": False},
-                    "productSpecificationIds": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "price": {
-                        "type": "object",
-                        "properties": {
-                            "amount": {"type": "number"},
-                            "currency": {"type": "string", "default": "USD"},
-                            "period": {"type": "string", "default": "monthly"}
-                        }
-                    }
-                },
-                "required": ["name", "description", "category"]
-            }
-        )
-    
-    def link_offering_to_specification_tool(self) -> Tool:
-        return Tool(
-            name="link_offering_to_specification",
-            description="Link a product offering to service specifications",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "productOfferingId": {"type": "string"},
-                    "serviceSpecificationIds": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["productOfferingId", "serviceSpecificationIds"]
-            }
-        )
-    
-    def add_geographic_coverage_tool(self) -> Tool:
-        return Tool(
-            name="add_geographic_coverage",
-            description="Add geographic coverage for a service specification",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "serviceSpecificationId": {"type": "string"},
-                    "locations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "streetName": {"type": "string"},
-                                "streetNumber": {"type": "string"},
-                                "city": {"type": "string"},
-                                "coverage": {"type": "string", "enum": ["full", "partial", "planned"]}
-                            }
-                        }
-                    }
-                },
-                "required": ["serviceSpecificationId", "locations"]
-            }
-        )
-    
-    async def ensure_session(self):
-        """Ensure aiohttp session is created"""
-        if self.session is None:
-            self.session = aiohttp.ClientSession()
-    
-    async def handle_tool_call(self, name: str, arguments: Any) -> List[ToolCallResult]:
-        """Handle tool calls and route to appropriate TMF API"""
-        try:
-            await self.ensure_session()
-            
-            # Existing customer-facing tools
-            if name == "service_qualification":
-                result = await self.handle_service_qualification(arguments)
-            elif name == "customer_management":
-                result = await self.handle_customer_management(arguments)
-            elif name == "product_ordering":
-                result = await self.handle_product_ordering(arguments)
-            elif name == "service_activation":
-                result = await self.handle_service_activation(arguments)
-            
-            # New catalog management tools
-            elif name == "list_service_specifications":
-                result = await self.handle_list_service_specifications(arguments)
-            elif name == "list_product_offerings":
-                result = await self.handle_list_product_offerings(arguments)
-            elif name == "list_geographic_locations":
-                result = await self.handle_list_geographic_locations(arguments)
-            elif name == "sync_catalog_data":
-                result = await self.handle_sync_catalog_data(arguments)
-            elif name == "create_service_specification":
-                result = await self.handle_create_service_specification(arguments)
-            elif name == "create_product_offering":
-                result = await self.handle_create_product_offering(arguments)
-            elif name == "link_offering_to_specification":
-                result = await self.handle_link_offering_to_specification(arguments)
-            elif name == "add_geographic_coverage":
-                result = await self.handle_add_geographic_coverage(arguments)
-            else:
-                result = {"error": f"Unknown tool: {name}"}
-            
-            # Log the operation
-            self.log_audit(name, arguments, result)
-            
-            return [ToolCallResult(
-                toolResult=ToolResult(
-                    content=[TextContent(
-                        type="text",
-                        text=json.dumps(result, indent=2)
-                    )]
-                )
-            )]
-            
-        except Exception as e:
-            logger.error(f"Error handling tool call {name}: {str(e)}")
-            return [ToolCallResult(
-                toolResult=ToolResult(
-                    content=[TextContent(
-                        type="text",
-                        text=json.dumps({"error": str(e)})
-                    )]
-                )
-            )]
-    
-    # ===== EXISTING HANDLERS =====
-    
-    async def handle_service_qualification(self, arguments: Dict) -> Dict:
-        """TMF637: Service Qualification"""
-        url = f"{CATALOG_MANAGER_URL}/tmf637/serviceQualification"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
-    
-    async def handle_customer_management(self, arguments: Dict) -> Dict:
-        """TMF629: Customer Management"""
-        customer_id = arguments.get("customerId")
+    try:
+        # Get customer info
         url = f"{CATALOG_MANAGER_URL}/tmf629/customer/{customer_id}"
-        
-        async with self.session.get(url, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                return json.dumps({"error": "Customer not found"}, indent=2)
+            customer = await response.json()
+            
+        # Get active services for this customer
+        services_url = f"{CATALOG_MANAGER_URL}/api/customer/{customer_id}/services"
+        async with session.get(services_url, timeout=DEFAULT_TIMEOUT) as response:
+            services = await response.json()
+            
+        return json.dumps({
+            "customer": customer,
+            "active_services": services
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch customer details: {str(e)}"}, indent=2)
+
+@mcp.resource("orders://recent")
+async def get_recent_orders() -> str:
+    """Get recent orders from the system showing latest customer activity"""
+    await ensure_session()
     
-    async def handle_product_ordering(self, arguments: Dict) -> Dict:
-        """TMF622: Product Ordering"""
-        url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder"
-        
-        # Transform arguments to TMF622 format
-        order_data = {
-            "orderDate": arguments.get("orderDate"),
-            "externalId": arguments.get("externalId"),
-            "relatedParty": [{
-                "id": arguments.get("customerId"),
-                "role": "customer"
-            }],
-            "orderItem": [{
-                "action": "add",
-                "productOffering": {
-                    "id": arguments.get("productOfferingId")
-                },
-                "product": {
-                    "place": arguments.get("address")
-                }
-            }]
-        }
-        
-        async with self.session.post(url, json=order_data, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    url = f"{CATALOG_MANAGER_URL}/api/orders/recent"
+    try:
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            orders = await response.json()
+            return json.dumps(orders, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch recent orders: {str(e)}"}, indent=2)
+
+# Tools for performing actions
+
+@mcp.tool()
+async def service_qualification(
+    address: Dict[str, str],
+    serviceSpecification: Dict[str, str]
+) -> Dict[str, Any]:
+    """Check if a service is available at a specific location (TMF637)
     
-    async def handle_service_activation(self, arguments: Dict) -> Dict:
-        """TMF640: Service Activation"""
-        url = f"{CATALOG_MANAGER_URL}/tmf640/serviceActivation"
-        
-        # Transform arguments to TMF640 format
-        activation_data = {
-            "service": {
-                "name": arguments.get("serviceName"),
-                "serviceType": arguments.get("serviceType"),
-                "place": arguments.get("address"),
-                "serviceSpecification": {
-                    "id": arguments.get("serviceSpecificationId")
-                }
+    Args:
+        address: Address with streetName, streetNumber, and city
+        serviceSpecification: Service specification with id and name
+    
+    Returns:
+        Service qualification result
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf637/serviceQualification"
+    request_data = {
+        "address": address,
+        "serviceSpecification": serviceSpecification
+    }
+    
+    try:
+        async with session.post(url, json=request_data, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("service_qualification", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("service_qualification", request_data, error_result)
+        raise Exception(f"Service qualification failed: {str(e)}")
+
+@mcp.tool()
+async def customer_management(customerId: str) -> Dict[str, Any]:
+    """Get customer information including account status and eligibility (TMF629)
+    
+    Args:
+        customerId: The customer ID to look up
+    
+    Returns:
+        Customer information
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf629/customer/{customerId}"
+    
+    try:
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("customer_management", {"customerId": customerId}, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("customer_management", {"customerId": customerId}, error_result)
+        raise Exception(f"Customer lookup failed: {str(e)}")
+
+@mcp.tool()
+async def product_ordering(
+    orderDate: str,
+    externalId: str,
+    customerId: str,
+    productOfferingId: str,
+    address: Dict[str, str]
+) -> Dict[str, Any]:
+    """Create a product order for a customer (TMF622)
+    
+    Args:
+        orderDate: Order date
+        externalId: External order ID
+        customerId: Customer ID
+        productOfferingId: Product offering ID
+        address: Delivery address
+    
+    Returns:
+        Created order information
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder"
+    
+    # Transform to TMF622 format
+    order_data = {
+        "orderDate": orderDate,
+        "externalId": externalId,
+        "relatedParty": [{
+            "id": customerId,
+            "role": "customer"
+        }],
+        "orderItem": [{
+            "action": "add",
+            "productOffering": {
+                "id": productOfferingId
+            },
+            "product": {
+                "place": address
+            }
+        }]
+    }
+    
+    try:
+        async with session.post(url, json=order_data, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("product_ordering", order_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("product_ordering", order_data, error_result)
+        raise Exception(f"Product ordering failed: {str(e)}")
+
+@mcp.tool()
+async def service_activation(
+    serviceName: str,
+    serviceType: str,
+    address: Dict[str, str],
+    serviceSpecificationId: str
+) -> Dict[str, Any]:
+    """Activate a service in the network (TMF640)
+    
+    Args:
+        serviceName: Service name
+        serviceType: Service type (e.g., "Broadband")
+        address: Service address
+        serviceSpecificationId: Service specification ID
+    
+    Returns:
+        Service activation result
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf640/serviceActivation"
+    
+    # Transform to TMF640 format
+    activation_data = {
+        "service": {
+            "name": serviceName,
+            "serviceType": serviceType,
+            "place": address,
+            "serviceSpecification": {
+                "id": serviceSpecificationId
             }
         }
-        
-        async with self.session.post(url, json=activation_data, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    }
     
-    # ===== NEW CATALOG MANAGEMENT HANDLERS =====
+    try:
+        async with session.post(url, json=activation_data, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("service_activation", activation_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("service_activation", activation_data, error_result)
+        raise Exception(f"Service activation failed: {str(e)}")
+
+# Additional catalog management tools
+
+@mcp.tool()
+async def list_service_specifications(category: str = None) -> Dict[str, Any]:
+    """List all available service specifications (TMF633)
     
-    async def handle_list_service_specifications(self, arguments: Dict) -> Dict:
-        """TMF633: Service Catalog Management - List Service Specifications"""
-        url = f"{CATALOG_MANAGER_URL}/tmf633/serviceSpecification"
-        params = {}
-        
-        if arguments.get("category"):
-            params["category"] = arguments["category"]
-        
-        async with self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    Args:
+        category: Optional category filter
     
-    async def handle_list_product_offerings(self, arguments: Dict) -> Dict:
-        """TMF620: Product Catalog Management - List Product Offerings"""
-        url = f"{CATALOG_MANAGER_URL}/tmf620/productOffering"
-        params = {}
-        
-        if arguments.get("category"):
-            params["category"] = arguments["category"]
-        if arguments.get("isBundle") is not None:
-            params["isBundle"] = arguments["isBundle"]
-        
-        async with self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    Returns:
+        List of service specifications
+    """
+    await ensure_session()
     
-    async def handle_list_geographic_locations(self, arguments: Dict) -> Dict:
-        """TMF673: Geographic Address Management - List Locations"""
-        url = f"{CATALOG_MANAGER_URL}/tmf673/geographicLocation"
-        params = {}
-        
-        if arguments.get("city"):
-            params["city"] = arguments["city"]
-        if arguments.get("serviceType"):
-            params["serviceType"] = arguments["serviceType"]
-        
-        async with self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    url = f"{CATALOG_MANAGER_URL}/tmf633/serviceSpecification"
+    params = {}
+    if category:
+        params["category"] = category
     
-    async def handle_sync_catalog_data(self, arguments: Dict) -> Dict:
-        """Custom: Synchronize and validate catalog data"""
-        url = f"{CATALOG_MANAGER_URL}/admin/syncCatalog"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    try:
+        async with session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("list_service_specifications", {"category": category}, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("list_service_specifications", {"category": category}, error_result)
+        raise Exception(f"Failed to list service specifications: {str(e)}")
+
+@mcp.tool()
+async def list_product_offerings(category: str = None, isBundle: bool = None) -> Dict[str, Any]:
+    """List all available product offerings (TMF620)
     
-    async def handle_create_service_specification(self, arguments: Dict) -> Dict:
-        """TMF633: Create Service Specification"""
-        url = f"{CATALOG_MANAGER_URL}/tmf633/serviceSpecification"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    Args:
+        category: Optional category filter
+        isBundle: Filter for bundle vs individual offerings
     
-    async def handle_create_product_offering(self, arguments: Dict) -> Dict:
-        """TMF620: Create Product Offering"""
-        url = f"{CATALOG_MANAGER_URL}/tmf620/productOffering"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    Returns:
+        List of product offerings
+    """
+    await ensure_session()
     
-    async def handle_link_offering_to_specification(self, arguments: Dict) -> Dict:
-        """Custom: Link Product Offering to Service Specifications"""
-        offering_id = arguments.get("productOfferingId")
-        url = f"{CATALOG_MANAGER_URL}/admin/linkOffering/{offering_id}"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
+    url = f"{CATALOG_MANAGER_URL}/tmf620/productOffering"
+    params = {}
+    if category:
+        params["category"] = category
+    if isBundle is not None:
+        params["isBundle"] = isBundle
     
-    async def handle_add_geographic_coverage(self, arguments: Dict) -> Dict:
-        """Custom: Add Geographic Coverage for Service Specification"""
-        spec_id = arguments.get("serviceSpecificationId")
-        url = f"{CATALOG_MANAGER_URL}/admin/coverage/{spec_id}"
-        
-        async with self.session.post(url, json=arguments, timeout=DEFAULT_TIMEOUT) as response:
-            return await response.json()
-    
-    def log_audit(self, action: str, request: Dict, response: Dict):
-        """Log audit trail for compliance"""
-        audit_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "correlationId": f"{action}-{datetime.utcnow().timestamp()}",
-            "action": action,
-            "requestPayload": request,
-            "responsePayload": response,
-            "status": "Success" if "error" not in response else "Failed"
-        }
-        logger.info(f"Audit: {json.dumps(audit_entry)}")
-    
-    async def cleanup(self):
-        """Cleanup resources"""
-        if self.session:
-            await self.session.close()
-    
-    async def run(self):
-        """Run the MCP server"""
-        try:
-            async with self.server:
-                logger.info("Telepath MCP Server started with catalog management capabilities")
-                # Keep the server running
-                await asyncio.Event().wait()
-        finally:
-            await self.cleanup()
+    try:
+        async with session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("list_product_offerings", {"category": category, "isBundle": isBundle}, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("list_product_offerings", {"category": category, "isBundle": isBundle}, error_result)
+        raise Exception(f"Failed to list product offerings: {str(e)}")
 
 if __name__ == "__main__":
-    server = TelecomMCPServer()
-    asyncio.run(server.run())
+    print(f"Running Telepath MCP Server on {HOST}:{PORT}")
+    print(f"Catalog Manager URL: {CATALOG_MANAGER_URL}")
+    try:
+        mcp.run(transport="streamable-http")
+    finally:
+        # Cleanup session if exists
+        if session:
+            asyncio.run(cleanup_session())
