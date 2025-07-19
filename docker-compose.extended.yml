@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: telecom_postgres
+    environment:
+      POSTGRES_USER: telecom_user
+      POSTGRES_PASSWORD: telecom_pass
+      POSTGRES_DB: telecom_catalog
+    volumes:
+      - ./init_db_extended.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telecom_user -d telecom_catalog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - telecom_network
+
+  catalog-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.catalog.extended
+    container_name: catalog_manager
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: telecom_catalog
+      DB_USER: telecom_user
+      DB_PASSWORD: telecom_pass
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - telecom_network
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp.extended
+    container_name: mcp_server
+    environment:
+      CATALOG_MANAGER_URL: http://catalog-manager:8080
+    ports:
+      - "8090:8090"
+    depends_on:
+      catalog-manager:
+        condition: service_healthy
+    networks:
+      - telecom_network
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+
+networks:
+  telecom_network:
+    driver: bridge

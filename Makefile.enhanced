@@ -1,0 +1,283 @@
+.PHONY: build up down logs clean test-mcp test-curl inspector enhanced-deploy enhanced-up enhanced-down enhanced-test
+
+# Standard commands (original version)
+build:
+	docker-compose build
+
+up:
+	docker-compose up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "Services are ready!"
+	@echo "Catalog Manager API: http://localhost:8080"
+	@echo "MCP Server: http://localhost:8090"
+	@echo "MCP Streaming endpoint: http://localhost:8090/mcp/stream"
+
+down:
+	docker-compose down
+
+logs:
+	docker-compose logs -f
+
+clean:
+	docker-compose down -v
+	docker system prune -f
+
+# Enhanced version commands
+enhanced-deploy:
+	@echo "🚀 Deploying Enhanced Telecom MCP System..."
+	@chmod +x deploy_enhanced.sh
+	./deploy_enhanced.sh
+
+enhanced-up:
+	docker-compose -f docker-compose.extended.yml up -d
+	@echo "Waiting for enhanced services to be ready..."
+	@sleep 15
+	@echo "Enhanced services are ready!"
+	@echo ""
+	@echo "📍 Service Endpoints:"
+	@echo "   • Catalog Manager API: http://localhost:8080"
+	@echo "   • MCP Server: http://localhost:8090"
+	@echo "   • MCP Streaming endpoint: http://localhost:8090/mcp/stream"
+	@echo ""
+	@echo "🆕 New APIs Available:"
+	@echo "   • GET /api/service-specifications"
+	@echo "   • GET /api/product-offerings"
+	@echo "   • GET /api/geographic-locations"
+	@echo "   • POST /api/sync-catalog-data"
+	@echo "   • POST /api/link-offering-to-specification"
+	@echo "   • POST /api/add-geographic-coverage"
+
+enhanced-down:
+	docker-compose -f docker-compose.extended.yml down
+
+enhanced-build:
+	docker-compose -f docker-compose.extended.yml build --no-cache
+
+enhanced-logs:
+	docker-compose -f docker-compose.extended.yml logs -f
+
+enhanced-clean:
+	docker-compose -f docker-compose.extended.yml down -v
+	docker system prune -f
+
+# Test enhanced functionality
+enhanced-test:
+	@echo "🧪 Testing Enhanced Telecom MCP Features..."
+	@echo ""
+	@echo "Testing Service Specifications API:"
+	@curl -s http://localhost:8080/api/service-specifications?limit=5 | jq '.specifications[].name' || echo "❌ Service specifications test failed"
+	@echo ""
+	@echo "Testing Product Offerings API:"
+	@curl -s http://localhost:8080/api/product-offerings?category=internet&limit=3 | jq '.offerings[].name' || echo "❌ Product offerings test failed"
+	@echo ""
+	@echo "Testing Geographic Locations API:"
+	@curl -s http://localhost:8080/api/geographic-locations?city=Springfield&limit=3 | jq '.locations[].street_name' || echo "❌ Geographic locations test failed"
+	@echo ""
+	@echo "Testing MCP Tools (list available tools):"
+	@curl -X POST http://localhost:8090/mcp/stream \
+		-H "Content-Type: application/json" \
+		-H "Accept: application/json-stream" \
+		-d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' | jq '.result.tools[].name' || echo "❌ MCP tools test failed"
+	@echo ""
+	@echo "✅ Enhanced testing completed!"
+
+# Create sample data for testing
+enhanced-sample-data:
+	@echo "🔧 Creating sample data for enhanced features..."
+	@echo "Creating new service specification..."
+	@curl -X POST http://localhost:8080/api/service-specifications \
+		-H "Content-Type: application/json" \
+		-d '{"name": "Test Fiber 5G", "service_type": "fiber_internet", "description": "5 Gbps fiber service for testing"}' | jq .
+	@echo ""
+	@echo "Creating new product offering..."
+	@curl -X POST http://localhost:8080/api/product-offerings \
+		-H "Content-Type: application/json" \
+		-d '{"name": "Test Premium Package", "description": "Premium test package", "category": "internet", "price_monthly": 199.99, "price_setup": 299.99}' | jq .
+	@echo ""
+	@echo "Running catalog sync..."
+	@curl -X POST http://localhost:8080/api/sync-catalog-data \
+		-H "Content-Type: application/json" \
+		-d '{"sync_type": "integrity_check"}' | jq .
+
+# Test the MCP server
+test-mcp:
+	@echo "Testing MCP server with HTTP streaming transport:"
+	@echo "MCP Server endpoint: http://localhost:8090/mcp/stream"
+	@echo "Installing test dependencies..."
+	@pip3 install -q -r requirements_test.txt 2>/dev/null || pip install -q -r requirements_test.txt
+	@echo "Running automated tests..."
+	python3 test_mcp.py
+
+# Setup Python virtual environment for testing
+venv:
+	@echo "Setting up Python virtual environment..."
+	python3 -m venv venv
+	@echo "Activate with: source venv/bin/activate"
+	@echo "Then run: pip install -r requirements_test.txt"
+
+# Test with curl
+test-curl:
+	@echo "Testing MCP server with curl:"
+	@echo "Listing tools:"
+	@curl -X POST http://localhost:8090/mcp/stream \
+		-H "Content-Type: application/json" \
+		-H "Accept: application/json-stream" \
+		-d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' | jq .
+	@echo "\n\nInitializing MCP:"
+	@curl -X POST http://localhost:8090/mcp/stream \
+		-H "Content-Type: application/json" \
+		-H "Accept: application/json-stream" \
+		-d '{"jsonrpc": "2.0", "method": "initialize", "params": {}, "id": 2}' | jq .
+
+# Run MCP Inspector
+inspector:
+	@echo "Starting MCP Inspector..."
+	@echo "Make sure services are running (make enhanced-up)"
+	@echo ""
+	@if ! command -v mcp-inspector > /dev/null; then \
+		echo "Installing MCP Inspector..."; \
+		npm install -g @anthropic/mcp-inspector; \
+	fi
+	@echo "Connecting to http://localhost:8090"
+	mcp-inspector http://localhost:8090
+
+# Individual service commands
+postgres:
+	docker-compose -f docker-compose.extended.yml up -d postgres
+
+catalog:
+	docker-compose -f docker-compose.extended.yml up -d catalog-manager
+
+mcp:
+	docker-compose -f docker-compose.extended.yml up -d mcp-server
+
+# Health checks
+health:
+	@echo "Checking enhanced service health..."
+	@echo "Catalog Manager:"
+	@curl -s http://localhost:8080/health | jq . || echo "❌ Catalog Manager not healthy"
+	@echo "\nMCP Server (attempting health check):"
+	@curl -s http://localhost:8090/health | jq . || echo "⚠️  MCP Server health endpoint not available"
+	@echo "\nContainer status:"
+	@docker-compose -f docker-compose.extended.yml ps
+
+# Database shell
+db-shell:
+	docker exec -it telecom_postgres psql -U telecom_user -d telecom_catalog
+
+# Reset database
+reset-db:
+	@chmod +x reset_db.sh
+	./reset_db.sh
+
+# Show enhanced endpoints
+show-endpoints:
+	@echo "📍 Enhanced Telecom MCP API Endpoints"
+	@echo "====================================="
+	@echo ""
+	@echo "🔧 TM Forum APIs:"
+	@echo "  POST /tmf637/serviceQualification    - Check service availability"
+	@echo "  GET  /tmf629/customer/{id}           - Get customer information"
+	@echo "  POST /tmf622/productOrder            - Create product order"
+	@echo "  POST /tmf640/serviceActivation       - Activate service"
+	@echo ""
+	@echo "📋 Catalog Management APIs:"
+	@echo "  GET  /api/service-specifications     - List/filter service specs"
+	@echo "  POST /api/service-specifications     - Create service spec"
+	@echo "  GET  /api/product-offerings          - List/filter product offerings"
+	@echo "  POST /api/product-offerings          - Create product offering"
+	@echo "  GET  /api/geographic-locations       - List locations with coverage"
+	@echo "  POST /api/geographic-locations       - Add geographic location"
+	@echo "  POST /api/link-offering-to-specification - Link products to services"
+	@echo "  POST /api/add-geographic-coverage    - Add coverage areas"
+	@echo "  POST /api/sync-catalog-data          - Validate and sync catalog"
+	@echo ""
+	@echo "📊 Legacy APIs (backward compatibility):"
+	@echo "  GET  /api/customers                  - List all customers"
+	@echo "  GET  /api/service-coverage           - Get service coverage map"
+	@echo "  GET  /api/customer/{id}/services     - Get customer services"
+	@echo "  GET  /api/orders/recent              - Get recent orders"
+	@echo ""
+	@echo "🤖 MCP Tools for Claude:"
+	@echo "  - service_qualification              - TMF637 service qualification"
+	@echo "  - customer_management                - TMF629 customer management"
+	@echo "  - product_ordering                   - TMF622 product ordering"
+	@echo "  - service_activation                 - TMF640 service activation"
+	@echo "  - list_service_specifications        - List/filter service specs"
+	@echo "  - list_product_offerings             - List/filter product offerings"
+	@echo "  - list_geographic_locations          - List locations with coverage"
+	@echo "  - sync_catalog_data                  - Validate and sync catalog"
+	@echo "  - create_service_specification       - Create new service specs"
+	@echo "  - create_product_offering            - Create new product offerings"
+	@echo "  - link_offering_to_specification     - Link products to services"
+	@echo "  - add_geographic_coverage            - Add coverage areas"
+
+# Backup database
+backup-db:
+	@chmod +x deploy_enhanced.sh
+	./deploy_enhanced.sh --backup-only
+
+# Migration from standard to enhanced
+migrate-to-enhanced:
+	@echo "🔄 Migrating from Standard to Enhanced Version..."
+	@echo "This will:"
+	@echo "  1. Backup current database"
+	@echo "  2. Stop current services"
+	@echo "  3. Deploy enhanced version"
+	@echo "  4. Migrate data to new schema"
+	@echo ""
+	@read -p "Continue? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@make enhanced-deploy
+
+# Quick demo of enhanced features
+demo:
+	@echo "🎬 Enhanced Telecom MCP Demo"
+	@echo "=========================="
+	@echo ""
+	@echo "1. Listing available service specifications:"
+	@curl -s http://localhost:8080/api/service-specifications?service_type=fiber_internet | jq '.specifications[] | {name, service_type, description}'
+	@echo ""
+	@echo "2. Listing product offerings in internet category:"
+	@curl -s http://localhost:8080/api/product-offerings?category=internet | jq '.offerings[] | {name, category, price_monthly}'
+	@echo ""
+	@echo "3. Checking geographic locations in Springfield:"
+	@curl -s http://localhost:8080/api/geographic-locations?city=Springfield | jq '.locations[] | {street_name, city, coverage_details}'
+	@echo ""
+	@echo "4. Running catalog integrity check:"
+	@curl -s -X POST http://localhost:8080/api/sync-catalog-data -H "Content-Type: application/json" -d '{"sync_type": "integrity_check"}' | jq '.results'
+	@echo ""
+	@echo "🎉 Demo completed!"
+
+# Help
+help:
+	@echo "Enhanced Telecom MCP Makefile Commands"
+	@echo "====================================="
+	@echo ""
+	@echo "🚀 Deployment:"
+	@echo "  enhanced-deploy      - Full deployment of enhanced version"
+	@echo "  enhanced-up          - Start enhanced services"
+	@echo "  enhanced-down        - Stop enhanced services"
+	@echo "  enhanced-build       - Build enhanced Docker images"
+	@echo "  migrate-to-enhanced  - Migrate from standard to enhanced"
+	@echo ""
+	@echo "🧪 Testing:"
+	@echo "  enhanced-test        - Test enhanced functionality"
+	@echo "  test-mcp            - Test MCP server"
+	@echo "  test-curl           - Test with curl"
+	@echo "  demo                - Run feature demonstration"
+	@echo ""
+	@echo "🔧 Management:"
+	@echo "  health              - Check service health"
+	@echo "  logs / enhanced-logs - View service logs"
+	@echo "  show-endpoints      - Show all available API endpoints"
+	@echo "  inspector           - Open MCP Inspector"
+	@echo ""
+	@echo "💾 Data:"
+	@echo "  enhanced-sample-data - Create sample data for testing"
+	@echo "  backup-db           - Backup database"
+	@echo "  db-shell            - Open database shell"
+	@echo "  reset-db            - Reset database"
+	@echo ""
+	@echo "🧹 Cleanup:"
+	@echo "  clean / enhanced-clean - Clean up containers and volumes"
