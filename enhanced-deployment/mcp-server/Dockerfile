@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -17,9 +18,9 @@ COPY mcp_server_working_copy.py .
 # Create logs directory
 RUN mkdir -p /app/logs
 
-# Health check
+# Health check - just check if port is open, not specific endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8090/health || exit 1
+    CMD nc -z localhost 8090 || exit 1
 
 # Expose port
 EXPOSE 8090

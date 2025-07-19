@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
-PORT = os.getenv("PORT", "8090")
+PORT = int(os.getenv("PORT", "8090"))
 HOST = os.getenv("HOST", "0.0.0.0")
 CATALOG_MANAGER_URL = "http://catalog-manager:8080"
 DEFAULT_TIMEOUT = 30
