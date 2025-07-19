@@ -1,48 +1,34 @@
 #!/bin/bash
 
-echo "🔧 Applying MCP Server fixes..."
-echo "==============================================="
+# Apply MCP Server Fixes
+echo "🔧 Applying MCP Server Fixes..."
 
-cd /Users/joe/dev/mcp_cm_v1/enhanced-deployment
+# Make this script executable
+chmod +x "$0"
 
-echo "📦 Stopping containers..."
-docker-compose down
+# Make scripts executable
+chmod +x deploy.sh
+chmod +x quick_fix.sh
+chmod +x test_mcp_tools.py
 
-echo "🚀 Rebuilding MCP server with clean cache..."
-docker-compose build --no-cache mcp-server
+echo "✅ Updated mcp_server_enhanced.py with proper tool discovery"
+echo "✅ Made test scripts executable"
 
-if [ $? -eq 0 ]; then
-    echo "✅ Build successful!"
-    
-    echo "🏃 Starting containers..."
-    docker-compose up -d
-    
-    echo "⏱️  Waiting for services to start..."
-    sleep 10
-    
-    echo "🔍 Checking container status..."
-    docker-compose ps
-    
-    echo "📋 Checking MCP server logs..."
-    docker-compose logs mcp-server --tail=20
-    
-    echo ""
-    echo "✅ MCP Server fix applied successfully!"
-    echo ""
-    echo "🔧 What was fixed:"
-    echo "   • Fixed dependency conflict (starlette version compatibility)"
-    echo "   • Updated to use FastMCP for HTTP streaming"
-    echo "   • Fixed imports and API compatibility"
-    echo "   • Updated Dockerfile for consistency"
-    echo ""
-    echo "🌐 MCP Server should now be running on: http://localhost:8090"
-    echo "📊 Check if it's working:"
-    echo "   curl http://localhost:8090/"
-    echo ""
-else
-    echo "❌ Build failed. Check the error messages above."
-    echo "🔧 Try these troubleshooting steps:"
-    echo "   1. Check the requirements.txt file"
-    echo "   2. Verify Docker has enough resources"
-    echo "   3. Check if there are any missing dependencies"
-fi
+echo ""
+echo "🚀 To deploy and test:"
+echo "1. Run: ./deploy.sh deploy"
+echo "2. Wait for services to start"
+echo "3. Test: python3 test_mcp_tools.py"
+echo ""
+echo "📋 Key fixes applied:"
+echo "  - Fixed list_tools handler registration"
+echo "  - Fixed call_tool handler registration"
+echo "  - Added proper error handling"
+echo "  - Enhanced HTTP status checking"
+echo "  - Improved logging and debugging"
+echo ""
+echo "🔗 Claude Desktop Config:"
+echo "  Use: /Users/joe/dev/mcp_cm_v1/claude_desktop_config.json"
+echo "  Points to: http://localhost:8090"
+echo ""
+echo "✅ MCP Server fixes applied successfully!"

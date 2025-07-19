@@ -1,32 +1,8 @@
-# MCP Framework with compatible versions
-mcp>=1.0.0
-
-# HTTP server - compatible with MCP requirements
-starlette>=0.39.0
-uvicorn>=0.25.0
-
-# Async HTTP client
-aiohttp>=3.9.0
-
-# JSON handling
-ujson>=5.8.0
-
-# Async support
-anyio>=4.6.0
-
-# HTTP client with SSE support
-httpx>=0.27.0
-httpx-sse>=0.4.0
-
-# Data validation
-pydantic>=2.8.0
-
-# SSE support for streaming
-sse-starlette>=2.0.0
-
-# Utilities
+# Fixed MCP Server Requirements - Working Implementation
+mcp>=1.0.0,<2.0.0
+aiohttp>=3.8.0,<4.0.0
 python-dateutil>=2.8.0
 python-dotenv>=1.0.0
-
-# Logging
-structlog>=23.2.0
+uvloop>=0.19.0
+starlette>=0.37.0,<0.40.0
+uvicorn>=0.24.0,<0.26.0

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/joe/dev/mcp_cm_v1/enhanced-deployment/mcp_server_test.py", line 9, in <module>
+    from mcp_server import TelecomMCPServer
+ModuleNotFoundError: No module named 'mcp_server'

@@ -1,0 +1,126 @@
+INFO:__main__:🚀 Telepath MCP Server initialized
+INFO:__main__:🌐 Starting HTTP server for Claude compatibility
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:__main__:🚀 Starting Hybrid Telepath MCP Server on 0.0.0.0:8090
+INFO:__main__:📊 Catalog Manager: http://catalog-manager:8080
+INFO:__main__:🎯 Server supports both stdio and HTTP transports
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8090 (Press CTRL+C to quit)
+INFO:     127.0.0.1:38874 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.253.116.207:31910 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57280 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53576 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37366 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51652 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44764 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50298 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39990 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57730 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43054 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58244 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44086 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49934 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42098 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50342 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40892 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57490 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48206 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47786 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59362 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37366 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41032 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60040 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59170 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:28062 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:29413 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59400 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36122 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:39325 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40918 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:59378 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:54622 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48804 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:21130 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:63623 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50918 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53282 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44928 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49468 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59590 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51852 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42538 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:62026 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:62026 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50238 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60566 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54036 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44812 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58034 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46942 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52548 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42232 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47482 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54794 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59140 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57064 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44822 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48294 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38702 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42688 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36640 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37916 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46944 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53646 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40754 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52734 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55572 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54736 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46288 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:32735 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35312 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57674 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:59745 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46328 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35602 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51638 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35698 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57544 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51646 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48180 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38672 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43662 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41274 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41418 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36314 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54114 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50712 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60068 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34094 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36228 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42908 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38952 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43462 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43834 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51398 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34342 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54762 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60680 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:HTTP MCP request: initialize
+INFO:     172.253.116.207:40639 - "POST /mcp/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39924 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56150 - "GET /health HTTP/1.1" 200 OK
