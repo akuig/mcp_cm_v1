@@ -1,0 +1,451 @@
+🧪 Testing Enhanced Telecom MCP Features...
+
+Testing Service Specifications API:
+"Cable 100 Mbps"
+"Cable 200 Mbps"
+"Cable 400 Mbps"
+"DSL 25 Mbps"
+"DSL 50 Mbps"
+
+Testing Product Offerings API:
+
+Testing Geographic Locations API:
+{
+  "offerings": [
+    {
+      "category": "internet",
+      "contract_length_months": 12,
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "description": "High-speed 400 Mbps cable internet",
+      "id": "pkg_cable_400",
+      "is_active": true,
+      "linked_services": [
+        {
+          "id": "cable_400",
+          "is_primary": true,
+          "name": "Cable 400 Mbps",
+          "service_type": "cable_internet"
+        }
+      ],
+      "name": "TeleCo Cable Max",
+      "price_monthly": "49.99",
+      "price_setup": "49.99",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "category": "internet",
+      "contract_length_months": 12,
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "description": "High-speed 500 Mbps fiber internet",
+      "id": "pkg_fiber_500",
+      "is_active": true,
+      "linked_services": [
+        {
+          "id": "fiber_500",
+          "is_primary": true,
+          "name": "Fiber 500 Mbps",
+          "service_type": "fiber_internet"
+        }
+      ],
+      "name": "TeleCo Fiber 500",
+      "price_monthly": "59.99",
+      "price_setup": "99.99",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "category": "internet",
+      "contract_length_months": 0,
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "description": "Ultra-fast 5G+ wireless internet",
+      "id": "pkg_wireless_300",
+      "is_active": true,
+      "linked_services": [
+        {
+          "id": "wireless_300",
+          "is_primary": true,
+          "name": "Wireless 300 Mbps",
+          "service_type": "wireless_broadband"
+        }
+      ],
+      "name": "TeleCo 5G Home",
+      "price_monthly": "69.99",
+      "price_setup": "0.00",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "category": "internet",
+      "contract_length_months": 12,
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "description": "Ultra-fast 1 Gbps fiber internet",
+      "id": "pkg_fiber_1000",
+      "is_active": true,
+      "linked_services": [
+        {
+          "id": "fiber_1000",
+          "is_primary": true,
+          "name": "Fiber 1 Gbps",
+          "service_type": "fiber_internet"
+        }
+      ],
+      "name": "TeleCo Fiber Gig",
+      "price_monthly": "79.99",
+      "price_setup": "99.99",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "category": "internet",
+      "contract_length_months": 24,
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "description": "Professional 2 Gbps fiber for power users",
+      "id": "pkg_fiber_2000",
+      "is_active": true,
+      "linked_services": [
+        {
+          "id": "fiber_2000",
+          "is_primary": true,
+          "name": "Fiber 2 Gbps",
+          "service_type": "fiber_internet"
+        }
+      ],
+      "name": "TeleCo Fiber Pro",
+      "price_monthly": "129.99",
+      "price_setup": "199.99",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    }
+  ],
+  "pagination": {
+    "has_more": false,
+    "limit": 100,
+    "offset": 0,
+    "total": 5
+  }
+}
+
+Testing MCP Tools (list available tools):
+{
+  "locations": [
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": 400,
+          "service_type": "cable_internet",
+          "signal_strength": null,
+          "technology": "cable"
+        },
+        {
+          "available": true,
+          "coverage_quality": "fair",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 3,
+          "technology": "4G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "phone",
+          "signal_strength": null,
+          "technology": "voip"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "cable"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 4,
+      "latitude": "42.09950000",
+      "location_id": "loc_elm_321",
+      "location_type": "address",
+      "longitude": "-72.59200000",
+      "postal_code": "01103",
+      "state_province": "MA",
+      "street_name": "Elm Street",
+      "street_number": "321",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": 2000,
+          "service_type": "fiber_internet",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 5,
+          "technology": "5G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "phone",
+          "signal_strength": null,
+          "technology": "voip"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": 300,
+          "service_type": "wireless_broadband",
+          "signal_strength": 5,
+          "technology": "5G+"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 2,
+      "latitude": "42.10180000",
+      "location_id": "loc_main_123",
+      "location_type": "address",
+      "longitude": "-72.58950000",
+      "postal_code": "01101",
+      "state_province": "MA",
+      "street_name": "Main Street",
+      "street_number": "123",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": 2000,
+          "service_type": "fiber_internet",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 5,
+          "technology": "5G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "phone",
+          "signal_strength": null,
+          "technology": "voip"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "security",
+          "signal_strength": 5,
+          "technology": "wireless"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": 300,
+          "service_type": "wireless_broadband",
+          "signal_strength": 5,
+          "technology": "5G+"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 1,
+      "latitude": "42.10150000",
+      "location_id": "loc_main_456",
+      "location_type": "address",
+      "longitude": "-72.58980000",
+      "postal_code": "01101",
+      "state_province": "MA",
+      "street_name": "Main Street",
+      "street_number": "456",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": 1000,
+          "service_type": "fiber_internet",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 4,
+          "technology": "5G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "fiber"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 6,
+      "latitude": "42.10350000",
+      "location_id": "loc_maple_555",
+      "location_type": "address",
+      "longitude": "-72.58500000",
+      "postal_code": "01105",
+      "state_province": "MA",
+      "street_name": "Maple Drive",
+      "street_number": "555",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": 2000,
+          "service_type": "fiber_internet",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 4,
+          "technology": "5G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": null,
+          "service_type": "security",
+          "signal_strength": 4,
+          "technology": "wireless"
+        },
+        {
+          "available": true,
+          "coverage_quality": "excellent",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "fiber"
+        },
+        {
+          "available": true,
+          "coverage_quality": "good",
+          "max_speed_mbps": 300,
+          "service_type": "wireless_broadband",
+          "signal_strength": 4,
+          "technology": "5G"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 3,
+      "latitude": "42.10250000",
+      "location_id": "loc_oak_789",
+      "location_type": "address",
+      "longitude": "-72.58750000",
+      "postal_code": "01102",
+      "state_province": "MA",
+      "street_name": "Oak Avenue",
+      "street_number": "789",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    },
+    {
+      "city": "Springfield",
+      "country": "USA",
+      "coverage_details": [
+        {
+          "available": true,
+          "coverage_quality": "fair",
+          "max_speed_mbps": 50,
+          "service_type": "dsl_internet",
+          "signal_strength": null,
+          "technology": "dsl"
+        },
+        {
+          "available": true,
+          "coverage_quality": "fair",
+          "max_speed_mbps": null,
+          "service_type": "mobile",
+          "signal_strength": 3,
+          "technology": "4G"
+        },
+        {
+          "available": true,
+          "coverage_quality": "fair",
+          "max_speed_mbps": null,
+          "service_type": "tv",
+          "signal_strength": null,
+          "technology": "satellite"
+        }
+      ],
+      "created_at": "Mon, 28 Jul 2025 19:11:02 GMT",
+      "id": 5,
+      "latitude": "42.09850000",
+      "location_id": "loc_pine_101",
+      "location_type": "address",
+      "longitude": "-72.59450000",
+      "postal_code": "01104",
+      "state_province": "MA",
+      "street_name": "Pine Road",
+      "street_number": "101",
+      "updated_at": "Mon, 28 Jul 2025 19:11:02 GMT"
+    }
+  ],
+  "pagination": {
+    "has_more": false,
+    "limit": 100,
+    "offset": 0,
+    "total": 6
+  }
+}
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100    74  100     9  100    65   2931  21172 --:--:-- --:--:-- --:--:-- 24666
+jq: parse error: Invalid numeric literal at line 1, column 4
+❌ MCP tools test failed
+
+✅ Enhanced testing completed!

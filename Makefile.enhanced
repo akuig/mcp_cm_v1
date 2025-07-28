@@ -166,10 +166,25 @@ health:
 db-shell:
 	docker exec -it telecom_postgres psql -U telecom_user -d telecom_catalog
 
-# Reset database
+# Reset database (enhanced)
 reset-db:
+	@chmod +x reset_db_enhanced.sh
+	./reset_db_enhanced.sh
+
+# Reset database (basic - legacy)
+reset-db-basic:
 	@chmod +x reset_db.sh
 	./reset_db.sh
+
+# Fix database setup and initialization
+fix-database:
+	@chmod +x fix_database_setup.sh
+	./fix_database_setup.sh
+
+# Verify database state
+verify-db:
+	@chmod +x verify_db_enhanced.sh
+	./verify_db_enhanced.sh
 
 # Show enhanced endpoints
 show-endpoints:
@@ -277,7 +292,10 @@ help:
 	@echo "  enhanced-sample-data - Create sample data for testing"
 	@echo "  backup-db           - Backup database"
 	@echo "  db-shell            - Open database shell"
-	@echo "  reset-db            - Reset database"
+	@echo "  reset-db            - Reset database (enhanced)"
+	@echo "  reset-db-basic      - Reset database (basic/legacy)"
+	@echo "  fix-database        - Fix database setup and initialization"
+	@echo "  verify-db           - Verify database state"
 	@echo ""
 	@echo "🧹 Cleanup:"
 	@echo "  clean / enhanced-clean - Clean up containers and volumes"
