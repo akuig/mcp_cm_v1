@@ -176,6 +176,16 @@ reset-db-basic:
 	@chmod +x reset_db.sh
 	./reset_db.sh
 
+# Add order management functionality
+add-order-management:
+	@chmod +x add_order_management.sh
+	./add_order_management.sh
+
+# Restart with order management tool
+restart-with-orders:
+	@chmod +x restart_with_order_tool.sh
+	./restart_with_order_tool.sh
+
 # Fix database setup and initialization
 fix-database:
 	@chmod +x fix_database_setup.sh
@@ -295,6 +305,8 @@ help:
 	@echo "  reset-db            - Reset database (enhanced)"
 	@echo "  reset-db-basic      - Reset database (basic/legacy)"
 	@echo "  fix-database        - Fix database setup and initialization"
+	@echo "  add-order-management - Add TMF622 order management functionality"
+	@echo "  restart-with-orders - Restart services with order management tool"
 	@echo "  verify-db           - Verify database state"
 	@echo ""
 	@echo "🧹 Cleanup:"

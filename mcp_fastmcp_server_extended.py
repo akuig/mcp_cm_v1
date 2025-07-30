@@ -122,11 +122,23 @@ async def get_customer_details(customer_id: str) -> str:
 
 @mcp.resource("orders://recent")
 async def get_recent_orders() -> str:
-    """Get recent orders from the system showing latest customer activity"""
+    """Get recent orders from the system showing latest customer activity using TMF622 format"""
     await ensure_session()
     
-    url = f"{CATALOG_MANAGER_URL}/api/orders/recent"
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder?limit=10"
     async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        orders = await response.json()
+        return json.dumps(orders, indent=2)
+
+@mcp.resource("orders://customer/{customer_id}")
+async def get_customer_orders(customer_id: str) -> str:
+    """Get all orders for a specific customer using TMF622 format"""
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder?relatedParty.id={customer_id}"
+    async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+        if response.status == 404:
+            return json.dumps({"error": "No orders found for customer"}, indent=2)
         orders = await response.json()
         return json.dumps(orders, indent=2)
 
@@ -296,6 +308,66 @@ async def service_activation(
         error_result = {"error": str(e)}
         log_audit("service_activation", activation_data, error_result)
         raise Exception(f"Service activation failed: {str(e)}")
+
+@mcp.tool()
+async def order_management(
+    orderId: Optional[str] = None,
+    customerId: Optional[str] = None,
+    limit: int = 10,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """List and retrieve product orders using TMF622 standard (supports filtering by customer)
+    
+    Args:
+        orderId: Optional: Get specific order by ID
+        customerId: Optional: Filter orders by customer ID
+        limit: Maximum number of orders to retrieve (default: 10)
+        offset: Number of orders to skip for pagination (default: 0)
+    
+    Returns:
+        List of orders in TMF622 format or specific order details
+    """
+    await ensure_session()
+    
+    # If specific order ID is requested, get that order
+    if orderId:
+        url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder/{orderId}"
+        request_data = {"orderId": orderId}
+        
+        try:
+            async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+                if response.status == 404:
+                    result = {"error": "Order not found"}
+                else:
+                    result = await response.json()
+                log_audit("order_management_get_by_id", request_data, result)
+                return result
+        except Exception as e:
+            error_result = {"error": str(e)}
+            log_audit("order_management_get_by_id", request_data, error_result)
+            raise Exception(f"Failed to retrieve order: {str(e)}")
+    
+    # Otherwise, list orders with optional filtering
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder"
+    params = {
+        "limit": limit,
+        "offset": offset
+    }
+    
+    if customerId:
+        params["relatedParty.id"] = customerId  # TMF622 standard parameter
+    
+    request_data = {"params": params}
+    
+    try:
+        async with session.get(url, params=params, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("order_management_list", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("order_management_list", request_data, error_result)
+        raise Exception(f"Failed to retrieve orders: {str(e)}")
 
 # ============================================================================
 # NEW CATALOG MANAGEMENT TOOLS
@@ -647,7 +719,7 @@ async def add_geographic_coverage(
 if __name__ == "__main__":
     print(f"Running Enhanced Telepath MCP Server on {HOST}:{PORT}")
     print(f"Catalog Manager URL: {CATALOG_MANAGER_URL}")
-    print(f"Available tools: 12 (4 TMF Forum + 8 Catalog Management)")
+    print(f"Available tools: 13 (5 TMF Forum + 8 Catalog Management)")
     try:
         mcp.run(transport="streamable-http")
     finally:

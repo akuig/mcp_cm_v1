@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Enhanced Catalog Manager - Implements TM Forum APIs for the demo
-Extended with new catalog management capabilities
+Catalog Manager - Implements TM Forum APIs for the demo
 """
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 import uuid
 from flask import Flask, request, jsonify
 import psycopg2
@@ -37,10 +36,6 @@ def get_db_connection():
 def health_check():
     """Health check endpoint"""
     return jsonify({"status": "healthy"})
-
-# ============================================================================
-# EXISTING TM FORUM APIs (TMF637, TMF629, TMF622, TMF640)
-# ============================================================================
 
 @app.route('/tmf637/serviceQualification', methods=['POST'])
 def service_qualification():
@@ -151,9 +146,16 @@ def get_customer(customer_id):
         logger.error(f"Error getting customer: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/tmf622/productOrder', methods=['POST'])
-def create_product_order():
-    """TMF622: Create product order"""
+@app.route('/tmf622/productOrder', methods=['GET', 'POST'])
+def handle_product_order():
+    """TMF622: Handle both GET (list/search) and POST (create) for product orders"""
+    if request.method == 'POST':
+        return create_product_order_internal()
+    else:  # GET method
+        return get_product_orders_internal()
+
+def create_product_order_internal():
+    """TMF622: Create product order (internal function)"""
     try:
         data = request.json
         order_id = str(uuid.uuid4())
@@ -211,6 +213,9 @@ def create_product_order():
     except Exception as e:
         logger.error(f"Error creating order: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+def get_product_orders_internal():
+    """TMF622: Get product orders (list/search) - internal function"""
 
 @app.route('/tmf640/serviceActivation', methods=['POST'])
 def activate_service():
@@ -275,705 +280,6 @@ def activate_service():
         logger.error(f"Error activating service: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# ============================================================================
-# ENHANCED CATALOG MANAGEMENT APIs - NEW
-# ============================================================================
-
-@app.route('/api/service-specifications', methods=['GET', 'POST'])
-def handle_service_specifications():
-    """List/filter service specifications (GET) or create new ones (POST)"""
-    if request.method == 'GET':
-        return list_service_specifications()
-    elif request.method == 'POST':
-        return create_service_specification()
-
-def list_service_specifications():
-    """Enhanced: List/filter all service specifications"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get query parameters for filtering
-        service_type = request.args.get('service_type')
-        search = request.args.get('search')
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        
-        # Build dynamic query
-        query = """
-            SELECT ss.*, 
-                   COUNT(osl.product_offering_id) as linked_offerings_count
-            FROM service_specifications ss
-            LEFT JOIN offering_service_links osl ON ss.id = osl.service_specification_id
-        """
-        params = []
-        conditions = []
-        
-        if service_type:
-            conditions.append("ss.service_type = %s")
-            params.append(service_type)
-        
-        if search:
-            conditions.append("(ss.name ILIKE %s OR ss.description ILIKE %s)")
-            params.extend([f"%{search}%", f"%{search}%"])
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        query += """
-            GROUP BY ss.id, ss.name, ss.service_type, ss.description, ss.created_at, ss.updated_at
-            ORDER BY ss.service_type, ss.name
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        
-        cursor.execute(query, params)
-        specs = cursor.fetchall()
-        
-        # Get total count for pagination
-        count_query = "SELECT COUNT(*) FROM service_specifications ss"
-        if conditions:
-            count_query += " WHERE " + " AND ".join([c.replace("ss.", "") for c in conditions])
-        cursor.execute(count_query, params[:-2] if conditions else [])
-        total_count = cursor.fetchone()['count']
-        
-        cursor.close()
-        conn.close()
-        
-        result = {
-            "specifications": specs,
-            "pagination": {
-                "total": total_count,
-                "limit": limit,
-                "offset": offset,
-                "has_more": offset + limit < total_count
-            }
-        }
-        
-        return jsonify(result)
-    
-    except Exception as e:
-        logger.error(f"Error listing service specifications: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-def create_service_specification():
-    """Create new service specification"""
-    try:
-        data = request.json
-        spec_id = data.get('id') or str(uuid.uuid4())
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO service_specifications (
-                id, name, service_type, description, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING *
-        """, (
-            spec_id,
-            data.get('name'),
-            data.get('service_type'),
-            data.get('description'),
-            datetime.utcnow(),
-            datetime.utcnow()
-        ))
-        
-        spec = cursor.fetchone()
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify(spec), 201
-    
-    except Exception as e:
-        logger.error(f"Error creating service specification: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/product-offerings', methods=['GET', 'POST'])
-def handle_product_offerings():
-    """List/filter product offerings (GET) or create new ones (POST)"""
-    if request.method == 'GET':
-        return list_product_offerings()
-    elif request.method == 'POST':
-        return create_product_offering()
-
-def list_product_offerings():
-    """List/filter all product offerings"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get query parameters for filtering
-        category = request.args.get('category')
-        is_active = request.args.get('is_active', type=bool)
-        min_price = request.args.get('min_price', type=float)
-        max_price = request.args.get('max_price', type=float)
-        search = request.args.get('search')
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        include_services = request.args.get('include_services', 'true').lower() == 'true'
-        
-        # Build dynamic query
-        if include_services:
-            query = """
-                SELECT po.*, 
-                       COALESCE(
-                           JSON_AGG(
-                               JSON_BUILD_OBJECT(
-                                   'id', ss.id,
-                                   'name', ss.name,
-                                   'service_type', ss.service_type,
-                                   'is_primary', osl.is_primary
-                               ) ORDER BY osl.is_primary DESC, ss.service_type
-                           ) FILTER (WHERE ss.id IS NOT NULL), 
-                           '[]'::json
-                       ) as linked_services
-                FROM product_offerings po
-                LEFT JOIN offering_service_links osl ON po.id = osl.product_offering_id
-                LEFT JOIN service_specifications ss ON osl.service_specification_id = ss.id
-            """
-        else:
-            query = """
-                SELECT po.*,
-                       COUNT(osl.service_specification_id) as linked_services_count
-                FROM product_offerings po
-                LEFT JOIN offering_service_links osl ON po.id = osl.product_offering_id
-            """
-        
-        params = []
-        conditions = []
-        
-        if category:
-            conditions.append("po.category = %s")
-            params.append(category)
-        
-        if is_active is not None:
-            conditions.append("po.is_active = %s")
-            params.append(is_active)
-        
-        if min_price is not None:
-            conditions.append("po.price_monthly >= %s")
-            params.append(min_price)
-        
-        if max_price is not None:
-            conditions.append("po.price_monthly <= %s")
-            params.append(max_price)
-        
-        if search:
-            conditions.append("(po.name ILIKE %s OR po.description ILIKE %s)")
-            params.extend([f"%{search}%", f"%{search}%"])
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        if include_services:
-            query += """
-                GROUP BY po.id, po.name, po.description, po.category, po.price_monthly, 
-                         po.price_setup, po.contract_length_months, po.is_active, 
-                         po.created_at, po.updated_at
-            """
-        else:
-            query += " GROUP BY po.id"
-        
-        query += """
-            ORDER BY po.category, po.price_monthly
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        
-        cursor.execute(query, params)
-        offerings = cursor.fetchall()
-        
-        # Get total count for pagination
-        count_query = "SELECT COUNT(*) FROM product_offerings po"
-        if conditions:
-            count_query += " WHERE " + " AND ".join([c.replace("po.", "") for c in conditions])
-        cursor.execute(count_query, params[:-2] if conditions else [])
-        total_count = cursor.fetchone()['count']
-        
-        cursor.close()
-        conn.close()
-        
-        result = {
-            "offerings": offerings,
-            "pagination": {
-                "total": total_count,
-                "limit": limit,
-                "offset": offset,
-                "has_more": offset + limit < total_count
-            }
-        }
-        
-        return jsonify(result)
-    
-    except Exception as e:
-        logger.error(f"Error listing product offerings: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-def create_product_offering():
-    """Create new product offering"""
-    try:
-        data = request.json
-        offering_id = data.get('id') or str(uuid.uuid4())
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO product_offerings (
-                id, name, description, category, price_monthly, price_setup,
-                contract_length_months, is_active, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING *
-        """, (
-            offering_id,
-            data.get('name'),
-            data.get('description'),
-            data.get('category'),
-            data.get('price_monthly'),
-            data.get('price_setup', 0.0),
-            data.get('contract_length_months', 0),
-            data.get('is_active', True),
-            datetime.utcnow(),
-            datetime.utcnow()
-        ))
-        
-        offering = cursor.fetchone()
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify(offering), 201
-    
-    except Exception as e:
-        logger.error(f"Error creating product offering: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/geographic-locations', methods=['GET', 'POST'])
-def handle_geographic_locations():
-    """List/filter geographic locations (GET) or add new ones (POST)"""
-    if request.method == 'GET':
-        return list_geographic_locations()
-    elif request.method == 'POST':
-        return add_geographic_location()
-
-def list_geographic_locations():
-    """List locations with coverage info"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get query parameters for filtering
-        city = request.args.get('city')
-        state_province = request.args.get('state_province')
-        has_coverage = request.args.get('has_coverage', type=bool)
-        service_type = request.args.get('service_type')
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        include_coverage = request.args.get('include_coverage', 'true').lower() == 'true'
-        
-        if include_coverage:
-            query = """
-                SELECT gl.*,
-                       COALESCE(
-                           JSON_AGG(
-                               JSON_BUILD_OBJECT(
-                                   'service_type', scn.service_type,
-                                   'max_speed_mbps', scn.max_speed_mbps,
-                                   'available', scn.available,
-                                   'coverage_quality', scn.coverage_quality,
-                                   'technology', scn.technology,
-                                   'signal_strength', scn.signal_strength
-                               ) ORDER BY scn.service_type
-                           ) FILTER (WHERE scn.service_type IS NOT NULL), 
-                           '[]'::json
-                       ) as coverage_details
-                FROM geographic_locations gl
-                LEFT JOIN service_coverage_new scn ON gl.location_id = scn.location_id
-            """
-        else:
-            query = """
-                SELECT gl.*,
-                       COUNT(scn.service_type) as coverage_count
-                FROM geographic_locations gl
-                LEFT JOIN service_coverage_new scn ON gl.location_id = scn.location_id
-            """
-        
-        params = []
-        conditions = []
-        
-        if city:
-            conditions.append("gl.city = %s")
-            params.append(city)
-        
-        if state_province:
-            conditions.append("gl.state_province = %s")
-            params.append(state_province)
-        
-        if service_type:
-            conditions.append("scn.service_type = %s")
-            params.append(service_type)
-        
-        if has_coverage is not None:
-            if has_coverage:
-                conditions.append("scn.service_type IS NOT NULL")
-            else:
-                conditions.append("scn.service_type IS NULL")
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        query += """
-            GROUP BY gl.id, gl.location_id, gl.street_number, gl.street_name, 
-                     gl.city, gl.state_province, gl.postal_code, gl.country,
-                     gl.latitude, gl.longitude, gl.location_type, gl.created_at, gl.updated_at
-            ORDER BY gl.city, gl.street_name, gl.street_number
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        
-        cursor.execute(query, params)
-        locations = cursor.fetchall()
-        
-        # Get total count for pagination
-        count_query = """
-            SELECT COUNT(DISTINCT gl.id) 
-            FROM geographic_locations gl
-            LEFT JOIN service_coverage_new scn ON gl.location_id = scn.location_id
-        """
-        if conditions:
-            count_query += " WHERE " + " AND ".join(conditions)
-        cursor.execute(count_query, params[:-2])
-        total_count = cursor.fetchone()['count']
-        
-        cursor.close()
-        conn.close()
-        
-        result = {
-            "locations": locations,
-            "pagination": {
-                "total": total_count,
-                "limit": limit,
-                "offset": offset,
-                "has_more": offset + limit < total_count
-            }
-        }
-        
-        return jsonify(result)
-    
-    except Exception as e:
-        logger.error(f"Error listing geographic locations: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-def add_geographic_location():
-    """Add new geographic location"""
-    try:
-        data = request.json
-        location_id = data.get('location_id') or f"loc_{uuid.uuid4().hex[:8]}"
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO geographic_locations (
-                location_id, street_number, street_name, city, state_province,
-                postal_code, country, latitude, longitude, location_type,
-                created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING *
-        """, (
-            location_id,
-            data.get('street_number'),
-            data.get('street_name'),
-            data.get('city'),
-            data.get('state_province'),
-            data.get('postal_code'),
-            data.get('country', 'USA'),
-            data.get('latitude'),
-            data.get('longitude'),
-            data.get('location_type', 'address'),
-            datetime.utcnow(),
-            datetime.utcnow()
-        ))
-        
-        location = cursor.fetchone()
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify(location), 201
-    
-    except Exception as e:
-        logger.error(f"Error adding geographic location: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/link-offering-to-specification', methods=['POST'])
-def link_offering_to_specification():
-    """Link product offering to service specification"""
-    try:
-        data = request.json
-        offering_id = data.get('product_offering_id')
-        service_id = data.get('service_specification_id')
-        is_primary = data.get('is_primary', False)
-        
-        if not offering_id or not service_id:
-            return jsonify({"error": "Both product_offering_id and service_specification_id are required"}), 400
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Verify both offering and service exist
-        cursor.execute("SELECT id FROM product_offerings WHERE id = %s", (offering_id,))
-        if not cursor.fetchone():
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "Product offering not found"}), 404
-        
-        cursor.execute("SELECT id FROM service_specifications WHERE id = %s", (service_id,))
-        if not cursor.fetchone():
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "Service specification not found"}), 404
-        
-        # If this is set as primary, unset any existing primary for this offering
-        if is_primary:
-            cursor.execute("""
-                UPDATE offering_service_links 
-                SET is_primary = false 
-                WHERE product_offering_id = %s
-            """, (offering_id,))
-        
-        # Create the link
-        cursor.execute("""
-            INSERT INTO offering_service_links (
-                product_offering_id, service_specification_id, is_primary, created_at
-            ) VALUES (%s, %s, %s, %s)
-            ON CONFLICT (product_offering_id, service_specification_id) 
-            DO UPDATE SET is_primary = EXCLUDED.is_primary
-            RETURNING *
-        """, (offering_id, service_id, is_primary, datetime.utcnow()))
-        
-        link = cursor.fetchone()
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            "message": "Link created successfully",
-            "link": link
-        }), 201
-    
-    except Exception as e:
-        logger.error(f"Error linking offering to specification: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/add-geographic-coverage', methods=['POST'])
-def add_geographic_coverage():
-    """Add coverage area for services"""
-    try:
-        data = request.json
-        location_id = data.get('location_id')
-        service_type = data.get('service_type')
-        
-        if not location_id or not service_type:
-            return jsonify({"error": "Both location_id and service_type are required"}), 400
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Verify location exists
-        cursor.execute("SELECT location_id FROM geographic_locations WHERE location_id = %s", (location_id,))
-        if not cursor.fetchone():
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "Geographic location not found"}), 404
-        
-        # Add coverage
-        cursor.execute("""
-            INSERT INTO service_coverage_new (
-                location_id, service_type, max_speed_mbps, available,
-                coverage_quality, technology, signal_strength, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (location_id, service_type) 
-            DO UPDATE SET 
-                max_speed_mbps = EXCLUDED.max_speed_mbps,
-                available = EXCLUDED.available,
-                coverage_quality = EXCLUDED.coverage_quality,
-                technology = EXCLUDED.technology,
-                signal_strength = EXCLUDED.signal_strength,
-                updated_at = EXCLUDED.updated_at
-            RETURNING *
-        """, (
-            location_id,
-            service_type,
-            data.get('max_speed_mbps'),
-            data.get('available', True),
-            data.get('coverage_quality', 'good'),
-            data.get('technology'),
-            data.get('signal_strength'),
-            datetime.utcnow(),
-            datetime.utcnow()
-        ))
-        
-        coverage = cursor.fetchone()
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            "message": "Coverage added successfully",
-            "coverage": coverage
-        }), 201
-    
-    except Exception as e:
-        logger.error(f"Error adding geographic coverage: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sync-catalog-data', methods=['POST'])
-def sync_catalog_data():
-    """Validate and sync catalog integrity"""
-    try:
-        data = request.json or {}
-        sync_type = data.get('sync_type', 'full')  # full, integrity_check, coverage_sync
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Start a sync operation record
-        sync_id = str(uuid.uuid4())
-        cursor.execute("""
-            INSERT INTO sync_operations (
-                operation_type, status, started_at, details
-            ) VALUES (%s, %s, %s, %s)
-            RETURNING id
-        """, (f"{sync_type}_sync", "running", datetime.utcnow(), {"sync_id": sync_id}))
-        
-        operation_id = cursor.fetchone()['id']
-        conn.commit()
-        
-        results = {}
-        total_processed = 0
-        total_errors = 0
-        
-        if sync_type in ['full', 'integrity_check']:
-            # Check for orphaned product offerings
-            cursor.execute("""
-                SELECT po.id, po.name 
-                FROM product_offerings po
-                LEFT JOIN offering_service_links osl ON po.id = osl.product_offering_id
-                WHERE osl.product_offering_id IS NULL
-            """)
-            orphaned_offerings = cursor.fetchall()
-            
-            # Check for orphaned service specifications
-            cursor.execute("""
-                SELECT ss.id, ss.name 
-                FROM service_specifications ss
-                LEFT JOIN offering_service_links osl ON ss.id = osl.service_specification_id
-                WHERE osl.service_specification_id IS NULL
-            """)
-            orphaned_services = cursor.fetchall()
-            
-            # Check for locations without coverage
-            cursor.execute("""
-                SELECT gl.location_id, gl.street_name, gl.city
-                FROM geographic_locations gl
-                LEFT JOIN service_coverage_new scn ON gl.location_id = scn.location_id
-                WHERE scn.location_id IS NULL
-            """)
-            locations_no_coverage = cursor.fetchall()
-            
-            # Check for invalid pricing
-            cursor.execute("""
-                SELECT id, name, price_monthly
-                FROM product_offerings 
-                WHERE price_monthly < 0 OR price_monthly IS NULL
-            """)
-            invalid_pricing = cursor.fetchall()
-            
-            # Record integrity check results
-            checks = [
-                ('orphaned_offerings', len(orphaned_offerings), orphaned_offerings),
-                ('orphaned_services', len(orphaned_services), orphaned_services),
-                ('locations_no_coverage', len(locations_no_coverage), locations_no_coverage),
-                ('invalid_pricing', len(invalid_pricing), invalid_pricing)
-            ]
-            
-            for check_type, count, items in checks:
-                status = 'passed' if count == 0 else ('warning' if count < 5 else 'failed')
-                message = f"Found {count} items with issues" if count > 0 else f"No issues found"
-                
-                cursor.execute("""
-                    INSERT INTO catalog_integrity (check_type, status, message, details, checked_at)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (check_type, status, message, {"items": items}, datetime.utcnow()))
-                
-                results[check_type] = {
-                    "status": status,
-                    "count": count,
-                    "items": items[:10]  # Limit items in response
-                }
-                total_processed += count
-        
-        if sync_type in ['full', 'coverage_sync']:
-            # Sync coverage data between old and new tables
-            cursor.execute("""
-                INSERT INTO service_coverage_new (location_id, service_type, max_speed_mbps, available, technology, created_at, updated_at)
-                SELECT 
-                    COALESCE(gl.location_id, 'loc_' || md5(sc.street_name || sc.city || sc.service_type)) as location_id,
-                    sc.service_type,
-                    sc.max_speed_mbps,
-                    sc.available,
-                    CASE 
-                        WHEN sc.service_type LIKE '%fiber%' THEN 'fiber'
-                        WHEN sc.service_type LIKE '%cable%' THEN 'cable'
-                        WHEN sc.service_type LIKE '%dsl%' THEN 'dsl'
-                        WHEN sc.service_type LIKE '%wireless%' THEN 'wireless'
-                        ELSE 'unknown'
-                    END as technology,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP
-                FROM service_coverage sc
-                LEFT JOIN geographic_locations gl ON sc.street_name = gl.street_name AND sc.city = gl.city
-                ON CONFLICT (location_id, service_type) DO NOTHING
-            """)
-            
-            synced_coverage = cursor.rowcount
-            results['coverage_sync'] = {
-                "status": "completed",
-                "synced_records": synced_coverage
-            }
-            total_processed += synced_coverage
-        
-        # Update sync operation with results
-        cursor.execute("""
-            UPDATE sync_operations 
-            SET status = %s, completed_at = %s, records_processed = %s, errors_count = %s, details = %s
-            WHERE id = %s
-        """, ("completed", datetime.utcnow(), total_processed, total_errors, results, operation_id))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            "message": "Catalog sync completed",
-            "sync_id": sync_id,
-            "operation_id": operation_id,
-            "total_processed": total_processed,
-            "total_errors": total_errors,
-            "results": results
-        })
-    
-    except Exception as e:
-        logger.error(f"Error syncing catalog data: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# ============================================================================
-# EXISTING API ENDPOINTS (kept for backward compatibility)
-# ============================================================================
-
 @app.route('/api/customers', methods=['GET'])
 def get_all_customers():
     """Get all customers"""
@@ -995,6 +301,28 @@ def get_all_customers():
         return jsonify(customers)
     except Exception as e:
         logger.error(f"Error getting customers: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/service-specifications', methods=['GET'])
+def get_service_specifications():
+    """Get all service specifications"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, name, service_type, description
+            FROM service_specifications
+            ORDER BY service_type, name
+        """)
+        
+        specs = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify(specs)
+    except Exception as e:
+        logger.error(f"Error getting service specifications: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/service-coverage', methods=['GET'])
@@ -1076,6 +404,169 @@ def get_recent_orders():
         return jsonify(orders)
     except Exception as e:
         logger.error(f"Error getting recent orders: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# TMF622 ORDER RETRIEVAL ENDPOINTS - NEW
+# ============================================================================
+
+@app.route('/tmf622/productOrder', methods=['GET'])
+def get_product_orders():
+    """TMF622: Get product orders (list/search)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get query parameters
+        customer_id = request.args.get('relatedParty.id')  # TMF standard parameter
+        order_id = request.args.get('id')
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        # Build query
+        query = """
+            SELECT o.*, c.name as customer_name,
+                   oa.street_number, oa.street_name, oa.city,
+                   po.name as product_name, po.price_monthly
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
+        """
+        
+        params = []
+        conditions = []
+        
+        if order_id:
+            conditions.append("o.id = %s")
+            params.append(order_id)
+        
+        if customer_id:
+            conditions.append("o.customer_id = %s")
+            params.append(customer_id)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY o.created_at DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        orders = cursor.fetchall()
+        
+        # Format response in TMF622 standard format
+        tmf_orders = []
+        for order in orders:
+            tmf_order = {
+                "id": order['id'],
+                "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
+                "externalId": order['external_id'],
+                "state": order['status'],  # TMF uses 'state' instead of 'status'
+                "relatedParty": [{
+                    "id": order['customer_id'],
+                    "name": order['customer_name'],
+                    "role": "customer"
+                }] if order['customer_id'] else [],
+                "orderItem": [{
+                    "id": "1",
+                    "action": "add",
+                    "productOffering": {
+                        "id": order['product_offering_id'],
+                        "name": order['product_name']
+                    },
+                    "product": {
+                        "place": {
+                            "streetNumber": order['street_number'],
+                            "streetName": order['street_name'],
+                            "city": order['city']
+                        }
+                    }
+                }] if order['product_offering_id'] else [],
+                "orderTotalPrice": {
+                    "price": {
+                        "dutyFreeAmount": {
+                            "value": float(order['price_monthly']) if order['price_monthly'] else 0,
+                            "unit": "USD"
+                        }
+                    }
+                } if order['price_monthly'] else None
+            }
+            tmf_orders.append(tmf_order)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify(tmf_orders)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving orders: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tmf622/productOrder/<order_id>', methods=['GET'])
+def get_product_order_by_id(order_id):
+    """TMF622: Get specific product order by ID"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT o.*, c.name as customer_name,
+                   oa.street_number, oa.street_name, oa.city,
+                   po.name as product_name, po.price_monthly
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Format response in TMF622 standard format
+        tmf_order = {
+            "id": order['id'],
+            "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
+            "externalId": order['external_id'],
+            "state": order['status'],
+            "relatedParty": [{
+                "id": order['customer_id'],
+                "name": order['customer_name'],
+                "role": "customer"
+            }] if order['customer_id'] else [],
+            "orderItem": [{
+                "id": "1",
+                "action": "add",
+                "productOffering": {
+                    "id": order['product_offering_id'],
+                    "name": order['product_name']
+                },
+                "product": {
+                    "place": {
+                        "streetNumber": order['street_number'],
+                        "streetName": order['street_name'],
+                        "city": order['city']
+                    }
+                }
+            }] if order['product_offering_id'] else [],
+            "orderTotalPrice": {
+                "price": {
+                    "dutyFreeAmount": {
+                        "value": float(order['price_monthly']) if order['price_monthly'] else 0,
+                        "unit": "USD"
+                    }
+                }
+            } if order['price_monthly'] else None
+        }
+        
+        return jsonify(tmf_order)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving order: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
