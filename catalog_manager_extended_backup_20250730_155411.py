@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Catalog Manager - Implements TM Forum APIs for the demo
-Fixed routing issues and completed missing functions
 """
 
 import logging
@@ -147,17 +146,16 @@ def get_customer(customer_id):
         logger.error(f"Error getting customer: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# FIXED: Removed duplicate route and combined GET/POST handling
 @app.route('/tmf622/productOrder', methods=['GET', 'POST'])
 def handle_product_order():
     """TMF622: Handle both GET (list/search) and POST (create) for product orders"""
     if request.method == 'POST':
-        return create_product_order()
+        return create_product_order_internal()
     else:  # GET method
-        return get_product_orders()
+        return get_product_orders_internal()
 
-def create_product_order():
-    """TMF622: Create product order"""
+def create_product_order_internal():
+    """TMF622: Create product order (internal function)"""
     try:
         data = request.json
         order_id = str(uuid.uuid4())
@@ -216,163 +214,8 @@ def create_product_order():
         logger.error(f"Error creating order: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-def get_product_orders():
-    """TMF622: Get product orders (list/search) - FIXED: Now implemented"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get query parameters
-        customer_id = request.args.get('relatedParty.id')  # TMF standard parameter
-        order_id = request.args.get('id')
-        limit = request.args.get('limit', 10, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        
-        # Build query
-        query = """
-            SELECT o.*, c.name as customer_name,
-                   oa.street_number, oa.street_name, oa.city,
-                   po.name as product_name, po.price_monthly
-            FROM orders o
-            LEFT JOIN customers c ON o.customer_id = c.id
-            LEFT JOIN order_addresses oa ON o.id = oa.order_id
-            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
-        """
-        
-        params = []
-        conditions = []
-        
-        if order_id:
-            conditions.append("o.id = %s")
-            params.append(order_id)
-        
-        if customer_id:
-            conditions.append("o.customer_id = %s")
-            params.append(customer_id)
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        query += " ORDER BY o.created_at DESC LIMIT %s OFFSET %s"
-        params.extend([limit, offset])
-        
-        cursor.execute(query, params)
-        orders = cursor.fetchall()
-        
-        # Format response in TMF622 standard format
-        tmf_orders = []
-        for order in orders:
-            tmf_order = {
-                "id": order['id'],
-                "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
-                "externalId": order['external_id'],
-                "state": order['status'],  # TMF uses 'state' instead of 'status'
-                "relatedParty": [{
-                    "id": order['customer_id'],
-                    "name": order['customer_name'],
-                    "role": "customer"
-                }] if order['customer_id'] else [],
-                "orderItem": [{
-                    "id": "1",
-                    "action": "add",
-                    "productOffering": {
-                        "id": order['product_offering_id'],
-                        "name": order['product_name']
-                    },
-                    "product": {
-                        "place": {
-                            "streetNumber": order['street_number'],
-                            "streetName": order['street_name'],
-                            "city": order['city']
-                        }
-                    }
-                }] if order['product_offering_id'] else [],
-                "orderTotalPrice": {
-                    "price": {
-                        "dutyFreeAmount": {
-                            "value": float(order['price_monthly']) if order['price_monthly'] else 0,
-                            "unit": "USD"
-                        }
-                    }
-                } if order['price_monthly'] else None
-            }
-            tmf_orders.append(tmf_order)
-        
-        cursor.close()
-        conn.close()
-        
-        return jsonify(tmf_orders)
-    
-    except Exception as e:
-        logger.error(f"Error retrieving orders: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/tmf622/productOrder/<order_id>', methods=['GET'])
-def get_product_order_by_id(order_id):
-    """TMF622: Get specific product order by ID"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT o.*, c.name as customer_name,
-                   oa.street_number, oa.street_name, oa.city,
-                   po.name as product_name, po.price_monthly
-            FROM orders o
-            LEFT JOIN customers c ON o.customer_id = c.id
-            LEFT JOIN order_addresses oa ON o.id = oa.order_id
-            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
-            WHERE o.id = %s
-        """, (order_id,))
-        
-        order = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if not order:
-            return jsonify({"error": "Order not found"}), 404
-        
-        # Format response in TMF622 standard format
-        tmf_order = {
-            "id": order['id'],
-            "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
-            "externalId": order['external_id'],
-            "state": order['status'],
-            "relatedParty": [{
-                "id": order['customer_id'],
-                "name": order['customer_name'],
-                "role": "customer"
-            }] if order['customer_id'] else [],
-            "orderItem": [{
-                "id": "1",
-                "action": "add",
-                "productOffering": {
-                    "id": order['product_offering_id'],
-                    "name": order['product_name']
-                },
-                "product": {
-                    "place": {
-                        "streetNumber": order['street_number'],
-                        "streetName": order['street_name'],
-                        "city": order['city']
-                    }
-                }
-            }] if order['product_offering_id'] else [],
-            "orderTotalPrice": {
-                "price": {
-                    "dutyFreeAmount": {
-                        "value": float(order['price_monthly']) if order['price_monthly'] else 0,
-                        "unit": "USD"
-                    }
-                }
-            } if order['price_monthly'] else None
-        }
-        
-        return jsonify(tmf_order)
-    
-    except Exception as e:
-        logger.error(f"Error retrieving order: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+def get_product_orders_internal():
+    """TMF622: Get product orders (list/search) - internal function"""
 
 @app.route('/tmf640/serviceActivation', methods=['POST'])
 def activate_service():
@@ -561,6 +404,169 @@ def get_recent_orders():
         return jsonify(orders)
     except Exception as e:
         logger.error(f"Error getting recent orders: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# TMF622 ORDER RETRIEVAL ENDPOINTS - NEW
+# ============================================================================
+
+@app.route('/tmf622/productOrder', methods=['GET'])
+def get_product_orders():
+    """TMF622: Get product orders (list/search)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get query parameters
+        customer_id = request.args.get('relatedParty.id')  # TMF standard parameter
+        order_id = request.args.get('id')
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        # Build query
+        query = """
+            SELECT o.*, c.name as customer_name,
+                   oa.street_number, oa.street_name, oa.city,
+                   po.name as product_name, po.price_monthly
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
+        """
+        
+        params = []
+        conditions = []
+        
+        if order_id:
+            conditions.append("o.id = %s")
+            params.append(order_id)
+        
+        if customer_id:
+            conditions.append("o.customer_id = %s")
+            params.append(customer_id)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY o.created_at DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        orders = cursor.fetchall()
+        
+        # Format response in TMF622 standard format
+        tmf_orders = []
+        for order in orders:
+            tmf_order = {
+                "id": order['id'],
+                "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
+                "externalId": order['external_id'],
+                "state": order['status'],  # TMF uses 'state' instead of 'status'
+                "relatedParty": [{
+                    "id": order['customer_id'],
+                    "name": order['customer_name'],
+                    "role": "customer"
+                }] if order['customer_id'] else [],
+                "orderItem": [{
+                    "id": "1",
+                    "action": "add",
+                    "productOffering": {
+                        "id": order['product_offering_id'],
+                        "name": order['product_name']
+                    },
+                    "product": {
+                        "place": {
+                            "streetNumber": order['street_number'],
+                            "streetName": order['street_name'],
+                            "city": order['city']
+                        }
+                    }
+                }] if order['product_offering_id'] else [],
+                "orderTotalPrice": {
+                    "price": {
+                        "dutyFreeAmount": {
+                            "value": float(order['price_monthly']) if order['price_monthly'] else 0,
+                            "unit": "USD"
+                        }
+                    }
+                } if order['price_monthly'] else None
+            }
+            tmf_orders.append(tmf_order)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify(tmf_orders)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving orders: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tmf622/productOrder/<order_id>', methods=['GET'])
+def get_product_order_by_id(order_id):
+    """TMF622: Get specific product order by ID"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT o.*, c.name as customer_name,
+                   oa.street_number, oa.street_name, oa.city,
+                   po.name as product_name, po.price_monthly
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            LEFT JOIN product_offerings po ON o.product_offering_id = po.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Format response in TMF622 standard format
+        tmf_order = {
+            "id": order['id'],
+            "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
+            "externalId": order['external_id'],
+            "state": order['status'],
+            "relatedParty": [{
+                "id": order['customer_id'],
+                "name": order['customer_name'],
+                "role": "customer"
+            }] if order['customer_id'] else [],
+            "orderItem": [{
+                "id": "1",
+                "action": "add",
+                "productOffering": {
+                    "id": order['product_offering_id'],
+                    "name": order['product_name']
+                },
+                "product": {
+                    "place": {
+                        "streetNumber": order['street_number'],
+                        "streetName": order['street_name'],
+                        "city": order['city']
+                    }
+                }
+            }] if order['product_offering_id'] else [],
+            "orderTotalPrice": {
+                "price": {
+                    "dutyFreeAmount": {
+                        "value": float(order['price_monthly']) if order['price_monthly'] else 0,
+                        "unit": "USD"
+                    }
+                }
+            } if order['price_monthly'] else None
+        }
+        
+        return jsonify(tmf_order)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving order: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
