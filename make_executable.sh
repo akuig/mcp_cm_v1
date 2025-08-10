@@ -1,5 +1,6 @@
 #!/bin/bash
-# Make all scripts executable
+chmod +x *.sh
+chmod +x scripts/*.sh 2>/dev/null || true
 
 echo "Making scripts executable..."
 chmod +x *.sh 2>/dev/null || true
