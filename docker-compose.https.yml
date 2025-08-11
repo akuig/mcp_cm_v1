@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  catalog-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.catalog
+    container_name: catalog-manager
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://catalog_user:catalog_pass@postgres:5432/catalog_db
+      - FLASK_ENV=production
+    depends_on:
+      - postgres
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # HTTPS proxy using nginx
+  https-proxy:
+    image: nginx:alpine
+    container_name: https-proxy
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - catalog-manager
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=catalog_db
+      - POSTGRES_USER=catalog_user
+      - POSTGRES_PASSWORD=catalog_pass
+    ports:
+      - "5433:5432"  # Changed to avoid conflict
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
