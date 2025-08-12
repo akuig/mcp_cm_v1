@@ -1,301 +1,278 @@
 #!/bin/bash
 
-# Enhanced Telecom MCP Deployment Script
-# Deploys the extended version with new TM Forum services
+# Complete deployment script for Enhanced Catalog Manager
+# This script handles all deployment scenarios
 
 set -e
 
-echo "🚀 Starting Enhanced Telecom MCP Deployment..."
-
-# Configuration
-BACKUP_DIR="./backups"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-COMPOSE_FILE="docker-compose.extended.yml"
-
-# Colors for output
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+# Print banner
+echo -e "${BLUE}"
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║     Telepath Enhanced Catalog Manager Deployment     ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo -e "${NC}"
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Function to print colored messages
+print_info() { echo -e "${BLUE}ℹ${NC} $1"; }
+print_success() { echo -e "${GREEN}✓${NC} $1"; }
+print_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
+print_error() { echo -e "${RED}✗${NC} $1"; }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Create backup directory
-mkdir -p "$BACKUP_DIR"
-
-# Function to backup database
-backup_database() {
-    print_status "Creating database backup..."
+# Function to check prerequisites
+check_prerequisites() {
+    echo -e "\n${YELLOW}Checking prerequisites...${NC}"
     
-    if docker ps | grep -q telecom_postgres; then
-        docker exec telecom_postgres pg_dump -U telecom_user telecom_catalog > "$BACKUP_DIR/catalog_backup_$TIMESTAMP.sql"
-        print_success "Database backed up to $BACKUP_DIR/catalog_backup_$TIMESTAMP.sql"
+    local all_good=true
+    
+    # Check Docker
+    if command -v docker &> /dev/null; then
+        print_success "Docker installed: $(docker --version)"
     else
-        print_warning "PostgreSQL container not running, skipping backup"
+        print_error "Docker not installed"
+        all_good=false
+    fi
+    
+    # Check Docker Compose
+    if command -v docker-compose &> /dev/null; then
+        print_success "Docker Compose installed: $(docker-compose --version)"
+    else
+        print_warning "Docker Compose not installed (optional)"
+    fi
+    
+    # Check Python
+    if command -v python3 &> /dev/null; then
+        print_success "Python3 installed: $(python3 --version)"
+    else
+        print_warning "Python3 not installed (needed for diagnostics)"
+    fi
+    
+    # Check required files
+    echo -e "\n${YELLOW}Checking required files...${NC}"
+    
+    local required_files=("catalog_manager_enhanced.py" "mcp_server.py" "Dockerfile" "requirements.txt")
+    for file in "${required_files[@]}"; do
+        if [ -f "$file" ]; then
+            print_success "Found: $file"
+        else
+            print_error "Missing: $file"
+            all_good=false
+        fi
+    done
+    
+    if [ "$all_good" = false ]; then
+        print_error "Prerequisites check failed. Please ensure all requirements are met."
+        exit 1
     fi
 }
 
 # Function to stop existing services
-stop_services() {
-    print_status "Stopping existing services..."
+stop_existing_services() {
+    echo -e "\n${YELLOW}Stopping existing services...${NC}"
     
-    if [ -f "docker-compose.yml" ]; then
-        docker-compose -f docker-compose.yml down || true
+    # Stop catalog manager
+    if docker ps | grep -q catalog_manager; then
+        docker stop catalog_manager 2>/dev/null || true
+        docker rm catalog_manager 2>/dev/null || true
+        print_success "Stopped existing catalog manager"
     fi
     
-    # Stop any running containers
-    docker stop telecom_postgres catalog_manager mcp_server 2>/dev/null || true
-    
-    print_success "Services stopped"
+    # Stop MCP server
+    if docker ps | grep -q mcp_server; then
+        docker stop mcp_server 2>/dev/null || true
+        docker rm mcp_server 2>/dev/null || true
+        print_success "Stopped existing MCP server"
+    fi
 }
 
-# Function to build new images
+# Function to build images
 build_images() {
-    print_status "Building enhanced Docker images..."
+    echo -e "\n${YELLOW}Building Docker images...${NC}"
     
-    docker-compose -f "$COMPOSE_FILE" build --no-cache
-    
-    print_success "Images built successfully"
+    # Build catalog manager
+    print_info "Building catalog-manager image..."
+    if docker build -t catalog-manager:latest -f Dockerfile . > /dev/null 2>&1; then
+        print_success "Built catalog-manager:latest"
+    else
+        print_error "Failed to build catalog-manager image"
+        exit 1
+    fi
 }
 
-# Function to start enhanced services
-start_services() {
-    print_status "Starting enhanced services..."
+# Function to deploy with docker-compose
+deploy_with_compose() {
+    echo -e "\n${YELLOW}Deploying with Docker Compose...${NC}"
     
-    docker-compose -f "$COMPOSE_FILE" up -d
+    local compose_file=$1
     
-    print_status "Waiting for services to be healthy..."
-    sleep 15
+    print_info "Using compose file: $compose_file"
     
-    # Check service health
-    check_services_health
+    if docker-compose -f "$compose_file" up -d; then
+        print_success "Services deployed successfully"
+    else
+        print_error "Failed to deploy services"
+        exit 1
+    fi
 }
 
-# Function to check service health
-check_services_health() {
-    local max_attempts=12
+# Function to deploy standalone
+deploy_standalone() {
+    echo -e "\n${YELLOW}Deploying standalone catalog manager...${NC}"
+    
+    docker run -d \
+        --name catalog_manager \
+        -p 8080:8080 \
+        -v "$(pwd)/catalog_manager_enhanced.py:/app/catalog_manager.py:ro" \
+        -v "$(pwd)/data:/app/data" \
+        --restart unless-stopped \
+        catalog-manager:latest
+    
+    if [ $? -eq 0 ]; then
+        print_success "Catalog manager deployed"
+    else
+        print_error "Failed to deploy catalog manager"
+        exit 1
+    fi
+}
+
+# Function to wait for services
+wait_for_services() {
+    echo -e "\n${YELLOW}Waiting for services to be ready...${NC}"
+    
+    local max_attempts=30
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            print_success "Catalog manager is ready!"
+            return 0
+        fi
+        
         attempt=$((attempt + 1))
-        print_status "Health check attempt $attempt/$max_attempts..."
-        
-        # Check PostgreSQL
-        if docker exec telecom_postgres pg_isready -U telecom_user -d telecom_catalog &>/dev/null; then
-            print_success "✓ PostgreSQL is healthy"
-        else
-            print_error "✗ PostgreSQL is not ready"
-            if [ $attempt -eq $max_attempts ]; then
-                print_error "PostgreSQL failed to start properly"
-                exit 1
-            fi
-            sleep 10
-            continue
-        fi
-        
-        # Check Catalog Manager
-        if curl -f http://localhost:8080/health &>/dev/null; then
-            print_success "✓ Catalog Manager is healthy"
-        else
-            print_error "✗ Catalog Manager is not ready"
-            if [ $attempt -eq $max_attempts ]; then
-                print_error "Catalog Manager failed to start properly"
-                exit 1
-            fi
-            sleep 10
-            continue
-        fi
-        
-        # Check MCP Server
-        if curl -f http://localhost:8090/health &>/dev/null; then
-            print_success "✓ MCP Server is healthy"
-        else
-            print_warning "✗ MCP Server health check failed (may not have health endpoint)"
-        fi
-        
-        break
+        echo -n "."
+        sleep 1
     done
+    
+    echo ""
+    print_error "Services failed to start within 30 seconds"
+    return 1
 }
 
-# Function to run database migrations
-run_migrations() {
-    print_status "Running database migrations for enhanced schema..."
+# Function to run tests
+run_tests() {
+    echo -e "\n${YELLOW}Running endpoint tests...${NC}"
     
-    # The enhanced init_db_extended.sql should handle the migration
-    # But we can add specific migration steps here if needed
-    
-    print_success "Database migrations completed"
-}
-
-# Function to test new functionality
-test_new_features() {
-    print_status "Testing new enhanced features..."
-    
-    # Test service specifications endpoint
-    if curl -s http://localhost:8080/api/service-specifications | jq . >/dev/null 2>&1; then
-        print_success "✓ Service specifications API working"
+    if [ -f "quick_test.py" ]; then
+        python3 quick_test.py http://localhost:8080
     else
-        print_error "✗ Service specifications API failed"
+        # Basic curl tests
+        print_info "Running basic tests..."
+        
+        # Health check
+        if curl -s http://localhost:8080/health | grep -q "healthy"; then
+            print_success "Health check passed"
+        else
+            print_error "Health check failed"
+        fi
+        
+        # API info
+        if curl -s http://localhost:8080/api | grep -q "Telepath"; then
+            print_success "API info endpoint working"
+        else
+            print_error "API info endpoint not working"
+        fi
+        
+        # Service specifications
+        if curl -s http://localhost:8080/api/service-specifications | grep -q "serviceSpecifications"; then
+            print_success "Service specifications endpoint working"
+        else
+            print_error "Service specifications endpoint not working"
+        fi
     fi
-    
-    # Test product offerings endpoint
-    if curl -s http://localhost:8080/api/product-offerings | jq . >/dev/null 2>&1; then
-        print_success "✓ Product offerings API working"
-    else
-        print_error "✗ Product offerings API failed"
-    fi
-    
-    # Test geographic locations endpoint
-    if curl -s http://localhost:8080/api/geographic-locations | jq . >/dev/null 2>&1; then
-        print_success "✓ Geographic locations API working"
-    else
-        print_error "✗ Geographic locations API failed"
-    fi
-    
-    print_success "Enhanced features testing completed"
 }
 
-# Function to display deployment summary
-show_summary() {
-    echo ""
-    echo "================================================"
-    echo "🎉 Enhanced Telecom MCP Deployment Complete!"
-    echo "================================================"
-    echo ""
-    echo "📍 Service Endpoints:"
-    echo "   • Catalog Manager API: http://localhost:8080"
-    echo "   • MCP Server: http://localhost:8090"
-    echo "   • MCP Streaming endpoint: http://localhost:8090/mcp/stream"
-    echo ""
-    echo "🔧 Enhanced APIs Available:"
-    echo "   • TMF637: Service Qualification"
-    echo "   • TMF629: Customer Management"
-    echo "   • TMF622: Product Ordering"
-    echo "   • TMF640: Service Activation"
-    echo ""
-    echo "🆕 New Catalog Management APIs:"
-    echo "   • GET /api/service-specifications - List/filter service specs"
-    echo "   • POST /api/service-specifications - Create service specs"
-    echo "   • GET /api/product-offerings - List/filter product offerings"
-    echo "   • POST /api/product-offerings - Create product offerings"
-    echo "   • GET /api/geographic-locations - List locations with coverage"
-    echo "   • POST /api/geographic-locations - Add new locations"
-    echo "   • POST /api/link-offering-to-specification - Link products to services"
-    echo "   • POST /api/add-geographic-coverage - Add coverage areas"
-    echo "   • POST /api/sync-catalog-data - Validate and sync catalog"
-    echo ""
-    echo "🛠️ New MCP Tools for Claude:"
-    echo "   • list_service_specifications"
-    echo "   • list_product_offerings"
-    echo "   • list_geographic_locations"
-    echo "   • sync_catalog_data"
-    echo "   • create_service_specification"
-    echo "   • create_product_offering"
-    echo "   • link_offering_to_specification"
-    echo "   • add_geographic_coverage"
-    echo ""
-    echo "📊 Management Commands:"
-    echo "   • make logs - View service logs"
-    echo "   • make health - Check service health"
-    echo "   • make test-enhanced - Test new features"
-    echo "   • make inspector - Open MCP Inspector"
-    echo ""
-    echo "📁 Backup Location: $BACKUP_DIR/catalog_backup_$TIMESTAMP.sql"
-    echo ""
+# Function to display information
+display_info() {
+    echo -e "\n${GREEN}════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}           Deployment Complete!${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
+    
+    echo -e "\n${YELLOW}Service Information:${NC}"
+    echo "  • Catalog Manager: http://localhost:8080"
+    echo "  • Health Check:    http://localhost:8080/health"
+    echo "  • API Info:        http://localhost:8080/api"
+    
+    echo -e "\n${YELLOW}Available Endpoints:${NC}"
+    echo "  Core TMF APIs:"
+    echo "    • POST /tmf637/serviceQualification"
+    echo "    • GET  /tmf629/customer/{id}"
+    echo "    • POST /tmf622/productOrder"
+    echo "    • POST /tmf640/serviceActivation"
+    
+    echo "  Enhanced Catalog APIs:"
+    echo "    • GET/POST /api/service-specifications"
+    echo "    • GET/POST /api/product-offerings"
+    echo "    • GET      /api/geographic-locations"
+    echo "    • GET      /api/orders"
+    echo "    • POST     /api/sync"
+    
+    echo -e "\n${YELLOW}Useful Commands:${NC}"
+    echo "  • View logs:       docker logs -f catalog_manager"
+    echo "  • Stop service:    docker stop catalog_manager"
+    echo "  • Run diagnostics: python3 catalog_diagnostics.py http://localhost:8080"
+    echo "  • Use with ngrok:  ngrok http 8080"
 }
 
-# Main deployment flow
+# Main execution
 main() {
-    echo "Enhanced Telecom MCP Deployment"
-    echo "==============================="
-    echo ""
+    # Parse arguments
+    local deployment_type="standalone"
     
-    # Check if docker and docker-compose are available
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker is not installed or not in PATH"
-        exit 1
-    fi
-    
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "docker-compose is not installed or not in PATH"
-        exit 1
-    fi
-    
-    # Check if jq is available for testing
-    if ! command -v jq &> /dev/null; then
-        print_warning "jq is not installed - some tests will be skipped"
-    fi
-    
-    print_status "Starting deployment process..."
-    
-    # Backup existing database
-    backup_database
-    
-    # Stop existing services
-    stop_services
-    
-    # Build new images
-    build_images
-    
-    # Start enhanced services
-    start_services
-    
-    # Run any necessary migrations
-    run_migrations
-    
-    # Test new functionality
-    test_new_features
-    
-    # Show deployment summary
-    show_summary
-    
-    print_success "Deployment completed successfully! 🎉"
-}
-
-# Handle script arguments
-case "${1:-}" in
-    --backup-only)
-        backup_database
-        exit 0
-        ;;
-    --test-only)
-        test_new_features
-        exit 0
-        ;;
-    --help)
-        echo "Enhanced Telecom MCP Deployment Script"
-        echo ""
-        echo "Usage: $0 [option]"
+    if [ "$1" = "--compose" ]; then
+        deployment_type="compose-simple"
+    elif [ "$1" = "--compose-full" ]; then
+        deployment_type="compose-full"
+    elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        echo "Usage: $0 [OPTIONS]"
         echo ""
         echo "Options:"
-        echo "  --backup-only    Only backup the database"
-        echo "  --test-only      Only test the new features"
-        echo "  --help           Show this help message"
+        echo "  --compose       Deploy with docker-compose (simple, in-memory)"
+        echo "  --compose-full  Deploy with docker-compose (with PostgreSQL)"
+        echo "  --help, -h      Show this help message"
         echo ""
-        echo "Default: Run full deployment"
+        echo "Default: Deploy standalone catalog manager"
         exit 0
-        ;;
-    "")
-        main
-        ;;
-    *)
-        print_error "Unknown option: $1"
-        echo "Use --help for usage information"
-        exit 1
-        ;;
-esac
+    fi
+    
+    # Run deployment steps
+    check_prerequisites
+    stop_existing_services
+    build_images
+    
+    case $deployment_type in
+        compose-simple)
+            deploy_with_compose "docker-compose.simple.yml"
+            ;;
+        compose-full)
+            deploy_with_compose "docker-compose.enhanced.yml"
+            ;;
+        *)
+            deploy_standalone
+            ;;
+    esac
+    
+    wait_for_services
+    run_tests
+    display_info
+    
+    echo -e "\n${GREEN}✨ Deployment successful! ✨${NC}\n"
+}
+
+# Run main function
+main "$@"

@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: telecom_pass
       POSTGRES_DB: telecom_catalog
     volumes:
-      - ./init_db_extended.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -24,7 +24,7 @@ services:
   catalog-manager:
     build:
       context: .
-      dockerfile: Dockerfile.catalog.enhanced
+      dockerfile: Dockerfile.catalog
     container_name: catalog_manager
     environment:
       DB_HOST: postgres
@@ -48,7 +48,7 @@ services:
   mcp-server:
     build:
       context: .
-      dockerfile: Dockerfile.mcp.enhanced
+      dockerfile: Dockerfile.mcp
     container_name: mcp_server
     environment:
       CATALOG_MANAGER_URL: http://catalog-manager:8080

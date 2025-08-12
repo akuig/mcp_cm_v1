@@ -1,0 +1,271 @@
+# Enhanced Telecom MCP System Makefile
+# Default to enhanced version with 13 tools
+
+.PHONY: build up down logs clean test help health demo setup
+
+# Default target
+all: build
+
+# Setup environment for first time
+setup:
+	@echo "🔧 Setting up Enhanced Telecom MCP System..."
+	@chmod +x *.sh 2>/dev/null || true
+	@if [ ! -f .env ]; then \
+		echo "Creating .env file..."; \
+		echo "COMPOSE_PROJECT_NAME=telecom_mcp" > .env; \
+		echo "DB_HOST=postgres" >> .env; \
+		echo "DB_PORT=5432" >> .env; \
+		echo "DB_NAME=telecom_catalog" >> .env; \
+		echo "DB_USER=telecom_user" >> .env; \
+		echo "DB_PASSWORD=telecom_pass" >> .env; \
+	fi
+	@echo "✅ Setup complete!"
+
+# Build all containers (enhanced version)
+build:
+	@echo "🏗️  Building Enhanced Telecom MCP (13 tools)..."
+	docker-compose -f docker-compose.extended.yml build --no-cache
+
+# Start all services (enhanced version)
+up:
+	@echo "🚀 Starting Enhanced Telecom MCP Services..."
+	docker-compose -f docker-compose.extended.yml up -d
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 15
+	@echo ""
+	@echo "✅ Enhanced services are ready!"
+	@echo ""
+	@echo "📍 Service Endpoints:"
+	@echo "   • Catalog Manager API: http://localhost:8080"
+	@echo "   • MCP Server: http://localhost:8090"
+	@echo "   • MCP Streaming: http://localhost:8090/mcp/stream"
+	@echo ""
+	@echo "🛠️  Available MCP Tools (13 total):"
+	@echo "   TMF Forum APIs (5):"
+	@echo "     • service_qualification (TMF637)"
+	@echo "     • customer_management (TMF629)"
+	@echo "     • product_ordering (TMF622)"
+	@echo "     • service_activation (TMF640)"
+	@echo "     • order_management (TMF622)"
+	@echo "   Catalog Management (8):"
+	@echo "     • list_service_specifications"
+	@echo "     • list_product_offerings"
+	@echo "     • list_geographic_locations"
+	@echo "     • sync_catalog_data"
+	@echo "     • create_service_specification"
+	@echo "     • create_product_offering"
+	@echo "     • link_offering_to_specification"
+	@echo "     • add_geographic_coverage"
+
+# Stop all services
+down:
+	docker-compose -f docker-compose.extended.yml down
+
+# Stop and remove volumes
+down-volumes:
+	docker-compose -f docker-compose.extended.yml down -v
+
+# View logs
+logs:
+	docker-compose -f docker-compose.extended.yml logs -f
+
+# View specific service logs
+logs-catalog:
+	docker-compose -f docker-compose.extended.yml logs -f catalog-manager
+
+logs-mcp:
+	docker-compose -f docker-compose.extended.yml logs -f mcp-server
+
+logs-db:
+	docker-compose -f docker-compose.extended.yml logs -f postgres
+
+# Clean up everything
+clean:
+	@echo "🧹 Cleaning up..."
+	docker-compose -f docker-compose.extended.yml down -v
+	docker system prune -f
+	@echo "✅ Cleanup complete!"
+
+# Rebuild from scratch
+rebuild: clean build
+
+# Quick restart
+restart: down up
+
+# Health checks
+health:
+	@echo "🏥 Checking service health..."
+	@echo ""
+	@echo "Catalog Manager:"
+	@curl -s http://localhost:8080/health | jq . || echo "❌ Catalog Manager not healthy"
+	@echo ""
+	@echo "Testing catalog endpoints:"
+	@curl -s http://localhost:8080/api/service-specifications?limit=1 | jq '.specifications[0].name' 2>/dev/null || echo "❌ Service specs endpoint failed"
+	@echo ""
+	@echo "Container status:"
+	@docker-compose -f docker-compose.extended.yml ps
+
+# Test the system
+test:
+	@echo "🧪 Testing Enhanced Telecom MCP System..."
+	@echo ""
+	@echo "1. Testing Catalog Manager health:"
+	@curl -s http://localhost:8080/health | jq .
+	@echo ""
+	@echo "2. Testing Service Specifications API:"
+	@curl -s http://localhost:8080/api/service-specifications?limit=2 | jq '.specifications[].name'
+	@echo ""
+	@echo "3. Testing Product Offerings API:"
+	@curl -s http://localhost:8080/api/product-offerings?category=internet&limit=2 | jq '.offerings[].name'
+	@echo ""
+	@echo "4. Testing Geographic Locations API:"
+	@curl -s http://localhost:8080/api/geographic-locations?city=Springfield&limit=2 | jq '.locations[].street_name'
+	@echo ""
+	@echo "5. Testing MCP Tools List:"
+	@curl -X POST http://localhost:8090/mcp/stream \
+		-H "Content-Type: application/json" \
+		-H "Accept: application/json-stream" \
+		-d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null | jq '.result.tools | length' | xargs echo "   Total tools available:"
+	@echo ""
+	@echo "✅ Testing completed!"
+
+# Quick demo
+demo:
+	@echo "🎬 Enhanced Telecom MCP Demo"
+	@echo "============================"
+	@sleep 2
+	@echo ""
+	@echo "📋 Listing Service Specifications:"
+	@curl -s http://localhost:8080/api/service-specifications?service_type=fiber_internet&limit=3 | jq '.specifications[] | {name, service_type}'
+	@sleep 1
+	@echo ""
+	@echo "💰 Listing Product Offerings:"
+	@curl -s http://localhost:8080/api/product-offerings?category=bundle&limit=3 | jq '.offerings[] | {name, price_monthly}'
+	@sleep 1
+	@echo ""
+	@echo "📍 Checking Coverage in Springfield:"
+	@curl -s http://localhost:8080/api/geographic-locations?city=Springfield&limit=3 | jq '.locations[] | {street_name, city}'
+	@sleep 1
+	@echo ""
+	@echo "🔧 Catalog Integrity Check:"
+	@curl -s -X POST http://localhost:8080/api/sync-catalog-data \
+		-H "Content-Type: application/json" \
+		-d '{"sync_type": "integrity_check"}' | jq '.results.summary'
+	@echo ""
+	@echo "✨ Demo completed!"
+
+# Database operations
+db-shell:
+	docker exec -it telecom_postgres psql -U telecom_user -d telecom_catalog
+
+db-reset:
+	@echo "⚠️  Resetting database..."
+	docker-compose -f docker-compose.extended.yml down -v
+	docker-compose -f docker-compose.extended.yml up -d postgres
+	@sleep 5
+	docker-compose -f docker-compose.extended.yml up -d
+	@echo "✅ Database reset complete!"
+
+# Development helpers
+shell-catalog:
+	docker exec -it catalog_manager /bin/bash
+
+shell-mcp:
+	docker exec -it mcp_server /bin/bash
+
+# Run Python test script
+test-python:
+	@echo "🐍 Running Python tests..."
+	python3 verify_13_tools.py
+
+# Docker stats
+stats:
+	docker stats --no-stream telecom_postgres catalog_manager mcp_server
+
+# Show all endpoints
+endpoints:
+	@echo "📍 Enhanced Telecom MCP API Endpoints"
+	@echo "======================================"
+	@echo ""
+	@echo "Catalog Manager (http://localhost:8080):"
+	@echo "  Health & Info:"
+	@echo "    GET  /health"
+	@echo ""
+	@echo "  TMF Forum APIs:"
+	@echo "    POST /tmf637/serviceQualification"
+	@echo "    GET  /tmf629/customer/{id}"
+	@echo "    POST /tmf622/productOrder"
+	@echo "    GET  /tmf622/productOrder"
+	@echo "    GET  /tmf622/productOrder/{id}"
+	@echo "    POST /tmf640/serviceActivation"
+	@echo ""
+	@echo "  Catalog Management APIs:"
+	@echo "    GET  /api/service-specifications"
+	@echo "    POST /api/service-specifications"
+	@echo "    GET  /api/product-offerings"
+	@echo "    POST /api/product-offerings"
+	@echo "    GET  /api/geographic-locations"
+	@echo "    POST /api/geographic-locations"
+	@echo "    POST /api/link-offering-to-specification"
+	@echo "    POST /api/add-geographic-coverage"
+	@echo "    POST /api/sync-catalog-data"
+	@echo "    GET  /api/catalog-integrity"
+	@echo ""
+	@echo "MCP Server (http://localhost:8090):"
+	@echo "  POST /mcp/stream (JSON-RPC endpoint)"
+
+# Install MCP Inspector
+inspector-install:
+	@echo "📦 Installing MCP Inspector..."
+	npm install -g @anthropic/mcp-inspector
+
+# Run MCP Inspector
+inspector:
+	@echo "🔍 Starting MCP Inspector..."
+	@echo "Make sure services are running (make up)"
+	mcp-inspector http://localhost:8090
+
+# Help command
+help:
+	@echo "Enhanced Telecom MCP System - Makefile Commands"
+	@echo "==============================================="
+	@echo ""
+	@echo "🚀 Quick Start:"
+	@echo "  make setup    - Initial setup (run once)"
+	@echo "  make build    - Build Docker images"
+	@echo "  make up       - Start all services"
+	@echo "  make down     - Stop all services"
+	@echo ""
+	@echo "🧪 Testing & Demo:"
+	@echo "  make test     - Run basic tests"
+	@echo "  make test-python - Run Python verification (13 tools)"
+	@echo "  make demo     - Run feature demonstration"
+	@echo "  make health   - Check service health"
+	@echo ""
+	@echo "📊 Monitoring:"
+	@echo "  make logs     - View all logs"
+	@echo "  make logs-catalog - View catalog manager logs"
+	@echo "  make logs-mcp - View MCP server logs"
+	@echo "  make stats    - Show container stats"
+	@echo ""
+	@echo "🔧 Development:"
+	@echo "  make shell-catalog - Shell into catalog container"
+	@echo "  make shell-mcp    - Shell into MCP container"
+	@echo "  make db-shell     - PostgreSQL shell"
+	@echo "  make endpoints    - Show all API endpoints"
+	@echo ""
+	@echo "🧹 Maintenance:"
+	@echo "  make restart  - Restart all services"
+	@echo "  make rebuild  - Clean rebuild"
+	@echo "  make clean    - Remove containers and volumes"
+	@echo "  make db-reset - Reset database"
+	@echo ""
+	@echo "🔍 Tools:"
+	@echo "  make inspector - Run MCP Inspector"
+	@echo "  make inspector-install - Install MCP Inspector"
+
+# Default target info
+info:
+	@echo "Enhanced Telecom MCP System"
+	@echo "Version: 2.0 (13 Tools)"
+	@echo "Run 'make help' for available commands"

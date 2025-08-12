@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Enhanced Catalog Manager - Standalone (in-memory storage)
+  catalog-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: catalog-manager:latest
+    container_name: catalog_manager
+    environment:
+      FLASK_ENV: production
+      LOG_LEVEL: INFO
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - ./catalog_manager_enhanced.py:/app/catalog_manager.py:ro
+      - ./data:/app/data  # Optional: for data persistence
+    networks:
+      - telecom_network
+    restart: unless-stopped
+
+networks:
+  telecom_network:
+    driver: bridge
+    name: telecom_network

@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Make all scripts executable
+echo "Making scripts executable..."
+
+chmod +x setup_and_verify.sh
+chmod +x deploy_enhanced.sh
+chmod +x catalog_diagnostics.py
+chmod +x quick_test.py
+chmod +x mcp_server.py
+chmod +x catalog_manager_enhanced.py
+
+echo "✅ All scripts are now executable!"
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo "           ENHANCED CATALOG MANAGER - READY TO DEPLOY"
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "📋 DEPLOYMENT OPTIONS:"
+echo ""
+echo "1️⃣  Quick Deploy (Recommended):"
+echo "    ./deploy_enhanced.sh"
+echo ""
+echo "2️⃣  Deploy with Docker Compose (simple):"
+echo "    ./deploy_enhanced.sh --compose"
+echo ""
+echo "3️⃣  Deploy with PostgreSQL:"
+echo "    ./deploy_enhanced.sh --compose-full"
+echo ""
+echo "4️⃣  Manual setup with verification:"
+echo "    ./setup_and_verify.sh"
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "📊 TESTING & DIAGNOSTICS:"
+echo ""
+echo "• Quick test all endpoints:"
+echo "    python3 quick_test.py"
+echo ""
+echo "• Full diagnostics:"
+echo "    python3 catalog_diagnostics.py http://localhost:8080"
+echo ""
+echo "• Test with ngrok URL:"
+echo "    python3 catalog_diagnostics.py https://your-url.ngrok.io"
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "🔧 FOR USE WITH CLAUDE:"
+echo ""
+echo "1. Start the catalog manager:"
+echo "    ./deploy_enhanced.sh"
+echo ""
+echo "2. In another terminal, start ngrok:"
+echo "    ngrok http 8080"
+echo ""
+echo "3. Use the ngrok HTTPS URL in your MCP configuration"
+echo ""
+echo "════════════════════════════════════════════════════════"
+echo ""
+echo "All files have been updated and are ready to use! 🚀"

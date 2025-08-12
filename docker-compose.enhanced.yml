@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database (optional - for production use)
   postgres:
     image: postgres:15-alpine
     container_name: telecom_postgres
@@ -9,7 +10,7 @@ services:
       POSTGRES_PASSWORD: telecom_pass
       POSTGRES_DB: telecom_catalog
     volumes:
-      - ./init_db_extended.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
@@ -21,17 +22,23 @@ services:
     networks:
       - telecom_network
 
+  # Enhanced Catalog Manager
   catalog-manager:
     build:
       context: .
-      dockerfile: Dockerfile.catalog.enhanced
+      dockerfile: Dockerfile
+    image: catalog-manager:latest
     container_name: catalog_manager
     environment:
+      # Database config (optional - comment out for in-memory storage)
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: telecom_catalog
       DB_USER: telecom_user
       DB_PASSWORD: telecom_pass
+      # Flask config
+      FLASK_ENV: production
+      LOG_LEVEL: INFO
     ports:
       - "8080:8080"
     depends_on:
@@ -39,32 +46,40 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./data:/app/data  # Optional: for data persistence
+      - ./catalog_manager_enhanced.py:/app/catalog_manager.py:ro  # Ensure enhanced version is used
     networks:
       - telecom_network
+    restart: unless-stopped
 
+  # MCP Server (optional - for running in Docker)
   mcp-server:
     build:
       context: .
-      dockerfile: Dockerfile.mcp.enhanced
+      dockerfile: Dockerfile.mcp
     container_name: mcp_server
     environment:
       CATALOG_MANAGER_URL: http://catalog-manager:8080
-    ports:
-      - "8090:8090"
+      LOG_LEVEL: INFO
     depends_on:
       catalog-manager:
         condition: service_healthy
+    volumes:
+      - ./mcp_server.py:/app/mcp_server.py:ro
     networks:
       - telecom_network
-    stdin_open: true
-    tty: true
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   telecom_network:
     driver: bridge
+    name: telecom_network

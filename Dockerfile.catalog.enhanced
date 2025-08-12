@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements_catalog.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements_catalog.txt
+
+# Copy the enhanced catalog manager
+COPY catalog_manager_extended.py catalog_manager.py
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Create non-root user
+RUN useradd -m -u 1000 cataloguser && \
+    chown -R cataloguser:cataloguser /app
+
+USER cataloguser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose Flask port
+EXPOSE 8080
+
+# Run the Flask app with proper logging
+CMD ["python", "-u", "catalog_manager.py"]
