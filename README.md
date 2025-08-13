@@ -2,7 +2,7 @@
 
 A demonstration system for the Telepath AI project that exposes telecommunications BSS/OSS systems through Model Context Protocol (MCP) servers, enabling autonomous operation by AI agents.
 
-## 🚀 Version 2.0 - Enhanced with 13 MCP Tools
+## 🚀 Version 3.x - Enhanced with 13 MCP Tools
 
 This enhanced version extends the original 4 tools to a comprehensive set of 13 tools, adding advanced catalog management capabilities while maintaining full backward compatibility.
 
@@ -428,7 +428,7 @@ For issues and questions:
 
 ---
 
-**Version**: 2.0.0  
+**Version**: 3.2
 **Last Updated**: December 2024  
 **Status**: Production Ready (Demo)  
 **Tools**: 13 MCP Tools Available
