@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 # Configuration
-CATALOG_MANAGER_URL = "http://catalog-manager:8080"  # Adjust URL as needed
+CATALOG_MANAGER_URL = "http://localhost:8080"  # Adjust URL as needed
 DEFAULT_TIMEOUT = 30
 
 class DemoReset:
