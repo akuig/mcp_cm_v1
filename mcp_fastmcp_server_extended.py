@@ -9,7 +9,7 @@ import logging
 import asyncio
 import json
 import aiohttp
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from mcp.server.fastmcp import FastMCP
 
 # Configure logging
@@ -41,7 +41,7 @@ async def cleanup_session():
         await session.close()
         session = None
 
-def log_audit(action: str, request: Dict, response: Dict):
+def log_audit(action: str, request: Dict, response: Union[Dict, List]):
     """Log audit trail for compliance"""
     from datetime import datetime
     audit_entry = {
@@ -50,7 +50,7 @@ def log_audit(action: str, request: Dict, response: Dict):
         "action": action,
         "requestPayload": request,
         "responsePayload": response,
-        "status": "Success" if "error" not in response else "Failed"
+        "status": "Success" if (isinstance(response, list) or "error" not in response) else "Failed"
     }
     logger.info(f"Audit: {audit_entry}")
 
@@ -315,7 +315,7 @@ async def order_management(
     customerId: Optional[str] = None,
     limit: int = 10,
     offset: int = 0
-) -> Dict[str, Any]:
+) -> Union[List, Dict]:
     """List and retrieve product orders using TMF622 standard (supports filtering by customer)
     
     Args:
