@@ -1,0 +1,85 @@
+# Demo Reset Configuration
+# Customize these settings for your environment
+
+# Catalog Manager Configuration
+catalog_manager:
+  # Base URL for the catalog manager API
+  url: "http://catalog-manager:8080"
+  # Alternative URLs for different environments
+  # url: "http://localhost:8080"          # Local development
+  # url: "https://api.example.com"        # Production
+  
+  # API timeout in seconds
+  timeout: 30
+
+# Demo Customers to Reset
+demo_customers:
+  - id: "8452934"
+    name: "Jane Doe"
+    description: "Primary demo customer"
+  
+  # Add more demo customers as needed
+  # - id: "1234567"
+  #   name: "John Smith" 
+  #   description: "Secondary demo customer"
+
+# Reset Options
+reset_options:
+  # Delete all orders for demo customers
+  delete_orders: true
+  
+  # Deactivate services for demo customers
+  deactivate_services: true
+  
+  # Clean up audit logs from today
+  cleanup_audit_logs: true
+  
+  # Reset product offerings (be careful with this)
+  reset_product_offerings: false
+  
+  # Reset service specifications (be careful with this)
+  reset_service_specifications: false
+
+# Database Configuration (if using direct database access)
+database:
+  # Database connection settings
+  # host: "localhost"
+  # port: 5432
+  # database: "catalog_manager"
+  # username: "demo_user"
+  # password: "demo_password"
+  
+  # Tables to clean up
+  tables_to_reset:
+    - "product_orders"
+    - "service_activations"
+    - "audit_logs"
+
+# Logging Configuration
+logging:
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
+  
+  # Keep last N log files
+  keep_logs: 10
+  
+  # Log file format
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+# Safety Settings
+safety:
+  # Require confirmation before reset (except dry run)
+  require_confirmation: true
+  
+  # Maximum number of orders to delete in one run
+  max_orders_to_delete: 100
+  
+  # Backup data before deletion
+  create_backup: false
+  
+  # Environments where reset is allowed
+  allowed_environments:
+    - "development"
+    - "demo"
+    - "test"
+    # Remove "production" to prevent accidental production resets
