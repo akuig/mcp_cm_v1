@@ -122,7 +122,18 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id VARCHAR(50) REFERENCES customers(id),
     product_offering_id VARCHAR(50),
     status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Order status history table for tracking order state changes
+CREATE TABLE IF NOT EXISTS order_status_history (
+    id SERIAL PRIMARY KEY,
+    order_id VARCHAR(50) REFERENCES orders(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reason TEXT,
+    changed_by VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS order_addresses (
@@ -346,6 +357,8 @@ CREATE INDEX idx_customers_status ON customers(account_status);
 CREATE INDEX idx_coverage_location ON service_coverage(street_name, city);
 CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_order_status_history_order ON order_status_history(order_id);
+CREATE INDEX idx_order_status_history_changed ON order_status_history(changed_at);
 
 -- New indexes for enhanced tables
 CREATE INDEX idx_geographic_locations_address ON geographic_locations(street_name, city);

@@ -716,10 +716,115 @@ async def add_geographic_coverage(
         log_audit("add_geographic_coverage", request_data, error_result)
         raise Exception(f"Failed to add geographic coverage: {str(e)}")
 
+# ============================================================================
+# NEW ORDER LIFECYCLE MANAGEMENT TOOLS (TMF622)
+# ============================================================================
+
+@mcp.tool()
+async def cancel_order(orderId: str) -> Dict[str, Any]:
+    """Cancel a product order (TMF622)
+    
+    Args:
+        orderId: The order ID to cancel
+    
+    Returns:
+        Cancelled order information with cancellation details
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder/{orderId}/cancel"
+    request_data = {"orderId": orderId}
+    
+    try:
+        async with session.post(url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                result = {"error": "Order not found"}
+            elif response.status == 400:
+                result = await response.json()
+            else:
+                result = await response.json()
+            log_audit("cancel_order", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("cancel_order", request_data, error_result)
+        raise Exception(f"Failed to cancel order: {str(e)}")
+
+@mcp.tool()
+async def delete_order(orderId: str) -> Dict[str, Any]:
+    """Delete a product order permanently (TMF622)
+    
+    Args:
+        orderId: The order ID to delete
+    
+    Returns:
+        Deletion confirmation with timestamp
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder/{orderId}"
+    request_data = {"orderId": orderId}
+    
+    try:
+        async with session.delete(url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                result = {"error": "Order not found"}
+            elif response.status == 400:
+                result = await response.json()
+            else:
+                result = await response.json()
+            log_audit("delete_order", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("delete_order", request_data, error_result)
+        raise Exception(f"Failed to delete order: {str(e)}")
+
+@mcp.tool()
+async def update_order_status(
+    orderId: str,
+    state: str,
+    reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """Update the status of a product order (TMF622)
+    
+    Args:
+        orderId: The order ID to update
+        state: New order state (acknowledged, inProgress, pending, held, completed, cancelled, failed, rejected)
+        reason: Optional reason for the status change
+    
+    Returns:
+        Updated order information with new status
+    """
+    await ensure_session()
+    
+    url = f"{CATALOG_MANAGER_URL}/tmf622/productOrder/{orderId}"
+    request_data = {
+        "state": state
+    }
+    if reason:
+        request_data["reason"] = reason
+    
+    try:
+        async with session.patch(url, json=request_data, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                result = {"error": "Order not found"}
+            elif response.status == 400:
+                result = await response.json()
+            else:
+                result = await response.json()
+            log_audit("update_order_status", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("update_order_status", request_data, error_result)
+        raise Exception(f"Failed to update order status: {str(e)}")
+
 if __name__ == "__main__":
     print(f"Running Enhanced Telepath MCP Server on {HOST}:{PORT}")
     print(f"Catalog Manager URL: {CATALOG_MANAGER_URL}")
-    print(f"Available tools: 13 (5 TMF Forum + 8 Catalog Management)")
+    print(f"Available tools: 16 (8 TMF Forum + 8 Catalog Management)")
+    print(f"New TMF622 Order Lifecycle tools: cancel_order, delete_order, update_order_status")
     try:
         mcp.run(transport="streamable-http")
     finally:

@@ -167,6 +167,104 @@ def handle_product_order():
     else:
         return get_product_orders()
 
+@app.route('/tmf622/productOrder/<order_id>', methods=['GET', 'PATCH', 'DELETE'])
+def handle_single_product_order(order_id):
+    """TMF622: Handle single order operations - GET, PATCH (update), DELETE"""
+    if request.method == 'GET':
+        return get_single_product_order(order_id)
+    elif request.method == 'PATCH':
+        return update_product_order(order_id)
+    elif request.method == 'DELETE':
+        return delete_product_order(order_id)
+
+@app.route('/tmf622/productOrder/<order_id>/cancel', methods=['POST'])
+def cancel_product_order(order_id):
+    """TMF622: Cancel a product order"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if order exists and get current status
+        cursor.execute("""
+            SELECT id, status FROM orders WHERE id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        if not order:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Check if order can be cancelled
+        if order['status'] in ['completed', 'cancelled', 'failed', 'rejected']:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Cannot cancel order with status: {order['status']}"
+            }), 400
+        
+        # Update order status to cancelled
+        cursor.execute("""
+            UPDATE orders 
+            SET status = 'cancelled', 
+                updated_at = %s
+            WHERE id = %s
+            RETURNING *
+        """, (datetime.utcnow(), order_id))
+        
+        updated_order = cursor.fetchone()
+        
+        # Log status change
+        cursor.execute("""
+            INSERT INTO order_status_history (order_id, status, changed_at, reason)
+            VALUES (%s, %s, %s, %s)
+        """, (order_id, 'cancelled', datetime.utcnow(), 'Order cancelled by user'))
+        
+        conn.commit()
+        
+        # Get complete order with address
+        cursor.execute("""
+            SELECT o.*, oa.street_number, oa.street_name, oa.city
+            FROM orders o
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order_with_details = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        # Return TMF622 compliant response
+        return jsonify({
+            "id": order_with_details['id'],
+            "orderDate": order_with_details['order_date'].isoformat() if order_with_details['order_date'] else None,
+            "state": order_with_details['status'],
+            "externalId": order_with_details['external_id'],
+            "relatedParty": [{
+                "id": order_with_details['customer_id'],
+                "role": "customer"
+            }],
+            "orderItem": [{
+                "action": "add",
+                "productOffering": {
+                    "id": order_with_details['product_offering_id']
+                },
+                "product": {
+                    "place": {
+                        "streetNumber": order_with_details['street_number'],
+                        "streetName": order_with_details['street_name'],
+                        "city": order_with_details['city']
+                    }
+                }
+            }],
+            "cancellationDate": datetime.utcnow().isoformat() + "Z",
+            "cancellationReason": "Order cancelled by user"
+        })
+    
+    except Exception as e:
+        logger.error(f"Error cancelling order: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 def create_product_order():
     """TMF622: Create product order"""
     try:
@@ -225,6 +323,195 @@ def create_product_order():
     
     except Exception as e:
         logger.error(f"Error creating order: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def get_single_product_order(order_id):
+    """TMF622: Get single product order by ID"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT o.*, oa.street_number, oa.street_name, oa.city
+            FROM orders o
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Return TMF622 compliant response
+        return jsonify({
+            "id": order['id'],
+            "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
+            "state": order['status'],
+            "externalId": order['external_id'],
+            "relatedParty": [{
+                "id": order['customer_id'],
+                "role": "customer"
+            }],
+            "orderItem": [{
+                "action": "add",
+                "productOffering": {
+                    "id": order['product_offering_id']
+                },
+                "product": {
+                    "place": {
+                        "streetNumber": order['street_number'],
+                        "streetName": order['street_name'],
+                        "city": order['city']
+                    }
+                }
+            }]
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting order: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def update_product_order(order_id):
+    """TMF622: Update product order status"""
+    try:
+        data = request.json
+        new_status = data.get('state') or data.get('status')
+        
+        if not new_status:
+            return jsonify({"error": "Missing 'state' field in request"}), 400
+        
+        # Valid TMF622 order states
+        valid_states = ['acknowledged', 'inProgress', 'pending', 'held', 
+                       'completed', 'cancelled', 'failed', 'rejected', 'created']
+        
+        if new_status not in valid_states:
+            return jsonify({
+                "error": f"Invalid state: {new_status}. Valid states are: {', '.join(valid_states)}"
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if order exists
+        cursor.execute("""
+            SELECT id, status FROM orders WHERE id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        if not order:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Update order status
+        cursor.execute("""
+            UPDATE orders 
+            SET status = %s, 
+                updated_at = %s
+            WHERE id = %s
+            RETURNING *
+        """, (new_status, datetime.utcnow(), order_id))
+        
+        updated_order = cursor.fetchone()
+        
+        # Log status change
+        reason = data.get('reason', f"Status changed from {order['status']} to {new_status}")
+        cursor.execute("""
+            INSERT INTO order_status_history (order_id, status, changed_at, reason)
+            VALUES (%s, %s, %s, %s)
+        """, (order_id, new_status, datetime.utcnow(), reason))
+        
+        conn.commit()
+        
+        # Get complete order with address
+        cursor.execute("""
+            SELECT o.*, oa.street_number, oa.street_name, oa.city
+            FROM orders o
+            LEFT JOIN order_addresses oa ON o.id = oa.order_id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order_with_details = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        # Return TMF622 compliant response
+        return jsonify({
+            "id": order_with_details['id'],
+            "orderDate": order_with_details['order_date'].isoformat() if order_with_details['order_date'] else None,
+            "state": order_with_details['status'],
+            "externalId": order_with_details['external_id'],
+            "relatedParty": [{
+                "id": order_with_details['customer_id'],
+                "role": "customer"
+            }],
+            "orderItem": [{
+                "action": "add",
+                "productOffering": {
+                    "id": order_with_details['product_offering_id']
+                },
+                "product": {
+                    "place": {
+                        "streetNumber": order_with_details['street_number'],
+                        "streetName": order_with_details['street_name'],
+                        "city": order_with_details['city']
+                    }
+                }
+            }],
+            "lastModifiedDate": datetime.utcnow().isoformat() + "Z"
+        })
+    
+    except Exception as e:
+        logger.error(f"Error updating order: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def delete_product_order(order_id):
+    """TMF622: Delete product order"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if order exists
+        cursor.execute("""
+            SELECT id, status FROM orders WHERE id = %s
+        """, (order_id,))
+        
+        order = cursor.fetchone()
+        if not order:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Order not found"}), 404
+        
+        # Only allow deletion of cancelled or failed orders
+        if order['status'] not in ['cancelled', 'failed', 'rejected', 'created']:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Cannot delete order with status: {order['status']}. Order must be cancelled, failed, rejected, or created."
+            }), 400
+        
+        # Delete related records first (due to foreign key constraints)
+        cursor.execute("DELETE FROM order_addresses WHERE order_id = %s", (order_id,))
+        cursor.execute("DELETE FROM order_status_history WHERE order_id = %s", (order_id,))
+        
+        # Delete the order
+        cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "message": f"Order {order_id} successfully deleted",
+            "id": order_id,
+            "deletedAt": datetime.utcnow().isoformat() + "Z"
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error deleting order: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 def get_product_orders():
