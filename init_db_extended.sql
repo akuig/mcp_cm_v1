@@ -102,7 +102,8 @@ CREATE TABLE IF NOT EXISTS customers (
     street_name VARCHAR(200),
     city VARCHAR(100),
     postal_code VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS service_coverage (

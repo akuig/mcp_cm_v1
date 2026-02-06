@@ -122,21 +122,38 @@ def service_qualification():
         logger.error(f"Error in service qualification: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/tmf629/customer/<customer_id>', methods=['GET'])
+@app.route('/tmf629/customer', methods=['GET', 'POST'])
+def handle_customer_collection():
+    """TMF629: Handle customer collection - GET (list/search) and POST (create)"""
+    if request.method == 'POST':
+        return create_customer()
+    else:
+        return list_customers_tmf()
+
+@app.route('/tmf629/customer/<customer_id>', methods=['GET', 'PATCH', 'DELETE'])
+def handle_single_customer(customer_id):
+    """TMF629: Handle single customer operations - GET, PATCH (update), DELETE"""
+    if request.method == 'GET':
+        return get_customer(customer_id)
+    elif request.method == 'PATCH':
+        return update_customer(customer_id)
+    elif request.method == 'DELETE':
+        return delete_customer(customer_id)
+
 def get_customer(customer_id):
     """TMF629: Get customer information"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT * FROM customers WHERE id = %s
         """, (customer_id,))
-        
+
         customer = cursor.fetchone()
         cursor.close()
         conn.close()
-        
+
         if customer:
             result = {
                 "id": customer['id'],
@@ -154,9 +171,246 @@ def get_customer(customer_id):
             return jsonify(result)
         else:
             return jsonify({"error": "Customer not found"}), 404
-    
+
     except Exception as e:
         logger.error(f"Error getting customer: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def create_customer():
+    """TMF629: Create a new customer"""
+    try:
+        data = request.json
+
+        if not data.get('name'):
+            return jsonify({"error": "Missing required field: 'name'"}), 400
+
+        customer_id = data.get('id', str(uuid.uuid4()))
+        account_status = data.get('accountStatus', 'active')
+        credit_score = data.get('creditScore')
+        has_overdue_payments = data.get('hasOverduePayments', False)
+
+        address = data.get('address', {})
+        street_number = address.get('streetNumber')
+        street_name = address.get('streetName')
+        city = address.get('city')
+        postal_code = address.get('postalCode')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO customers (
+                id, name, account_status, credit_score, has_overdue_payments,
+                street_number, street_name, city, postal_code
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING *
+        """, (
+            customer_id, data['name'], account_status, credit_score,
+            has_overdue_payments, street_number, street_name, city, postal_code
+        ))
+
+        customer = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        result = {
+            "id": customer['id'],
+            "name": customer['name'],
+            "accountStatus": customer['account_status'],
+            "creditScore": customer['credit_score'],
+            "hasOverduePayments": customer['has_overdue_payments'],
+            "address": {
+                "streetNumber": customer['street_number'],
+                "streetName": customer['street_name'],
+                "city": customer['city'],
+                "postalCode": customer['postal_code']
+            }
+        }
+        return jsonify(result), 201
+
+    except Exception as e:
+        logger.error(f"Error creating customer: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def list_customers_tmf():
+    """TMF629: List/search customers"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        name = request.args.get('name')
+        account_status = request.args.get('accountStatus')
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
+        query = "SELECT * FROM customers"
+        params = []
+        conditions = []
+
+        if name:
+            conditions.append("LOWER(name) LIKE %s")
+            params.append(f'%{name.lower()}%')
+
+        if account_status:
+            conditions.append("account_status = %s")
+            params.append(account_status)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY name LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+
+        cursor.execute(query, params)
+        customers = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        tmf_customers = []
+        for customer in customers:
+            tmf_customers.append({
+                "id": customer['id'],
+                "name": customer['name'],
+                "accountStatus": customer['account_status'],
+                "creditScore": customer['credit_score'],
+                "hasOverduePayments": customer['has_overdue_payments'],
+                "address": {
+                    "streetNumber": customer['street_number'],
+                    "streetName": customer['street_name'],
+                    "city": customer['city'],
+                    "postalCode": customer['postal_code']
+                }
+            })
+
+        return jsonify(tmf_customers)
+
+    except Exception as e:
+        logger.error(f"Error listing customers: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def update_customer(customer_id):
+    """TMF629: Update customer (PATCH semantics - only provided fields)"""
+    try:
+        data = request.json
+
+        # Map camelCase TMF fields to snake_case DB columns
+        field_map = {
+            'name': 'name',
+            'accountStatus': 'account_status',
+            'creditScore': 'credit_score',
+            'hasOverduePayments': 'has_overdue_payments',
+        }
+
+        address_field_map = {
+            'streetNumber': 'street_number',
+            'streetName': 'street_name',
+            'city': 'city',
+            'postalCode': 'postal_code',
+        }
+
+        set_clauses = []
+        params = []
+
+        for tmf_field, db_col in field_map.items():
+            if tmf_field in data:
+                set_clauses.append(f"{db_col} = %s")
+                params.append(data[tmf_field])
+
+        # Handle nested address fields
+        address = data.get('address', {})
+        for tmf_field, db_col in address_field_map.items():
+            if tmf_field in address:
+                set_clauses.append(f"{db_col} = %s")
+                params.append(address[tmf_field])
+
+        if not set_clauses:
+            return jsonify({"error": "No fields provided for update"}), 400
+
+        # Always update updated_at
+        set_clauses.append("updated_at = %s")
+        params.append(datetime.utcnow())
+
+        params.append(customer_id)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f"""
+            UPDATE customers
+            SET {', '.join(set_clauses)}
+            WHERE id = %s
+            RETURNING *
+        """, params)
+
+        customer = cursor.fetchone()
+
+        if not customer:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Customer not found"}), 404
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        result = {
+            "id": customer['id'],
+            "name": customer['name'],
+            "accountStatus": customer['account_status'],
+            "creditScore": customer['credit_score'],
+            "hasOverduePayments": customer['has_overdue_payments'],
+            "address": {
+                "streetNumber": customer['street_number'],
+                "streetName": customer['street_name'],
+                "city": customer['city'],
+                "postalCode": customer['postal_code']
+            },
+            "lastModifiedDate": datetime.utcnow().isoformat() + "Z"
+        }
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error updating customer: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def delete_customer(customer_id):
+    """TMF629: Delete a customer"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if customer exists
+        cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
+        customer = cursor.fetchone()
+        if not customer:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Customer not found"}), 404
+
+        # Check for linked orders
+        cursor.execute("SELECT COUNT(*) as count FROM orders WHERE customer_id = %s", (customer_id,))
+        order_count = cursor.fetchone()['count']
+        if order_count > 0:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Cannot delete customer with {order_count} linked order(s). Delete or reassign orders first."
+            }), 400
+
+        cursor.execute("DELETE FROM customers WHERE id = %s", (customer_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "message": f"Customer {customer_id} successfully deleted",
+            "id": customer_id,
+            "deletedAt": datetime.utcnow().isoformat() + "Z"
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error deleting customer: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/tmf622/productOrder', methods=['GET', 'POST'])

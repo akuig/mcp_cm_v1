@@ -213,6 +213,135 @@ async def customer_management(customerId: str) -> Dict[str, Any]:
         raise Exception(f"Customer lookup failed: {str(e)}")
 
 @mcp.tool()
+async def create_customer(
+    name: str,
+    accountStatus: str = "active",
+    creditScore: Optional[int] = None,
+    hasOverduePayments: bool = False,
+    address: Optional[Dict[str, str]] = None,
+    id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a new customer (TMF629)
+
+    Args:
+        name: Customer name (required)
+        accountStatus: Account status (default "active")
+        creditScore: Customer credit score
+        hasOverduePayments: Whether customer has overdue payments (default False)
+        address: Address with streetNumber, streetName, city, postalCode
+        id: Optional custom customer ID (auto-generated if not provided)
+
+    Returns:
+        Created customer information in TMF629 format
+    """
+    await ensure_session()
+
+    url = f"{CATALOG_MANAGER_URL}/tmf629/customer"
+    request_data = {
+        "name": name,
+        "accountStatus": accountStatus,
+        "hasOverduePayments": hasOverduePayments
+    }
+    if creditScore is not None:
+        request_data["creditScore"] = creditScore
+    if address:
+        request_data["address"] = address
+    if id:
+        request_data["id"] = id
+
+    try:
+        async with session.post(url, json=request_data, timeout=DEFAULT_TIMEOUT) as response:
+            result = await response.json()
+            log_audit("create_customer", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("create_customer", request_data, error_result)
+        raise Exception(f"Failed to create customer: {str(e)}")
+
+@mcp.tool()
+async def update_customer(
+    customerId: str,
+    name: Optional[str] = None,
+    accountStatus: Optional[str] = None,
+    creditScore: Optional[int] = None,
+    hasOverduePayments: Optional[bool] = None,
+    address: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]:
+    """Update an existing customer (TMF629) - PATCH semantics, only provided fields are changed
+
+    Args:
+        customerId: The customer ID to update (required)
+        name: Updated customer name
+        accountStatus: Updated account status
+        creditScore: Updated credit score
+        hasOverduePayments: Updated overdue payments flag
+        address: Updated address (streetNumber, streetName, city, postalCode)
+
+    Returns:
+        Updated customer information in TMF629 format
+    """
+    await ensure_session()
+
+    url = f"{CATALOG_MANAGER_URL}/tmf629/customer/{customerId}"
+    request_data = {}
+    if name is not None:
+        request_data["name"] = name
+    if accountStatus is not None:
+        request_data["accountStatus"] = accountStatus
+    if creditScore is not None:
+        request_data["creditScore"] = creditScore
+    if hasOverduePayments is not None:
+        request_data["hasOverduePayments"] = hasOverduePayments
+    if address is not None:
+        request_data["address"] = address
+
+    try:
+        async with session.patch(url, json=request_data, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                result = {"error": "Customer not found"}
+            elif response.status == 400:
+                result = await response.json()
+            else:
+                result = await response.json()
+            log_audit("update_customer", {"customerId": customerId, **request_data}, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("update_customer", {"customerId": customerId, **request_data}, error_result)
+        raise Exception(f"Failed to update customer: {str(e)}")
+
+@mcp.tool()
+async def delete_customer(customerId: str) -> Dict[str, Any]:
+    """Delete a customer (TMF629). Will fail if customer has linked orders.
+
+    Args:
+        customerId: The customer ID to delete
+
+    Returns:
+        Deletion confirmation with timestamp
+    """
+    await ensure_session()
+
+    url = f"{CATALOG_MANAGER_URL}/tmf629/customer/{customerId}"
+    request_data = {"customerId": customerId}
+
+    try:
+        async with session.delete(url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 404:
+                result = {"error": "Customer not found"}
+            elif response.status == 400:
+                result = await response.json()
+            else:
+                result = await response.json()
+            log_audit("delete_customer", request_data, result)
+            return result
+    except Exception as e:
+        error_result = {"error": str(e)}
+        log_audit("delete_customer", request_data, error_result)
+        raise Exception(f"Failed to delete customer: {str(e)}")
+
+@mcp.tool()
 async def product_ordering(
     orderDate: str,
     externalId: str,
@@ -823,8 +952,9 @@ async def update_order_status(
 if __name__ == "__main__":
     print(f"Running Enhanced Telepath MCP Server on {HOST}:{PORT}")
     print(f"Catalog Manager URL: {CATALOG_MANAGER_URL}")
-    print(f"Available tools: 16 (8 TMF Forum + 8 Catalog Management)")
-    print(f"New TMF622 Order Lifecycle tools: cancel_order, delete_order, update_order_status")
+    print(f"Available tools: 19 (11 TMF Forum + 8 Catalog Management)")
+    print(f"New TMF629 Customer CRUD tools: create_customer, update_customer, delete_customer")
+    print(f"TMF622 Order Lifecycle tools: cancel_order, delete_order, update_order_status")
     try:
         mcp.run(transport="streamable-http")
     finally:
