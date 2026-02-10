@@ -19,6 +19,15 @@ sleep 10
 # Initialize the database directly
 echo "Creating tables and inserting demo data..."
 docker exec -i telecom_postgres psql -U telecom_user -d telecom_catalog << 'EOF'
+-- Clear existing data (order matters due to foreign keys)
+DELETE FROM order_addresses;
+DELETE FROM activation_addresses;
+DELETE FROM orders;
+DELETE FROM service_activations;
+DELETE FROM service_coverage;
+DELETE FROM customers;
+DELETE FROM service_specifications;
+
 -- Create tables
 CREATE TABLE IF NOT EXISTS service_specifications (
     id VARCHAR(50) PRIMARY KEY,
@@ -143,6 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 -- Verify data
 SELECT COUNT(*) as customer_count FROM customers;
 SELECT COUNT(*) as coverage_count FROM service_coverage;
+SELECT COUNT(*) as order_count FROM orders;
 EOF
 
 echo ""
