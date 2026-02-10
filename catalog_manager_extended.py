@@ -1134,7 +1134,7 @@ def handle_product_offerings():
             for offering in offerings:
                 cursor.execute("""
                     SELECT ss.* FROM service_specifications ss
-                    JOIN product_service_links psl ON ss.id = psl.service_specification_id
+                    JOIN offering_service_links psl ON ss.id = psl.service_specification_id
                     WHERE psl.product_offering_id = %s
                 """, (offering['id'],))
                 offering['linked_services'] = cursor.fetchall()
@@ -1295,7 +1295,7 @@ def sync_catalog_data():
         cursor.execute("SELECT COUNT(*) as count FROM service_coverage")
         coverage_count = cursor.fetchone()['count']
         
-        cursor.execute("SELECT COUNT(*) as count FROM product_service_links")
+        cursor.execute("SELECT COUNT(*) as count FROM offering_service_links")
         links_count = cursor.fetchone()['count']
         
         cursor.close()
@@ -1311,7 +1311,7 @@ def sync_catalog_data():
                     "product_offerings": product_offerings_count,
                     "geographic_locations": locations_count,
                     "coverage_areas": coverage_count,
-                    "product_service_links": links_count
+                    "offering_service_links": links_count
                 },
                 "validation": {
                     "catalog_integrity": "valid",
@@ -1335,7 +1335,7 @@ def link_offering_to_specification():
         cursor = conn.cursor()
         
         cursor.execute("""
-            INSERT INTO product_service_links (
+            INSERT INTO offering_service_links (
                 product_offering_id, service_specification_id, is_primary
             ) VALUES (%s, %s, %s)
             ON CONFLICT (product_offering_id, service_specification_id) 
@@ -1434,7 +1434,7 @@ def get_catalog_integrity():
             SELECT COUNT(*) as count 
             FROM product_offerings po
             WHERE NOT EXISTS (
-                SELECT 1 FROM product_service_links psl 
+                SELECT 1 FROM offering_service_links psl 
                 WHERE psl.product_offering_id = po.id
             )
         """)
@@ -1443,7 +1443,7 @@ def get_catalog_integrity():
         # Check for missing specifications
         cursor.execute("""
             SELECT COUNT(*) as count 
-            FROM product_service_links psl
+            FROM offering_service_links psl
             WHERE NOT EXISTS (
                 SELECT 1 FROM service_specifications ss 
                 WHERE ss.id = psl.service_specification_id
