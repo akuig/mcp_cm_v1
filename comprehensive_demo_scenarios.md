@@ -110,7 +110,7 @@ Marcus: "I need to activate the fiber service for order ORD-2025-001..."
 
 ##### **Step 2: Coverage Analysis (Enhanced Geographic Locations)**
 ```
-Marcus: "Show me current coverage in Springfield with service gaps..."
+Marcus: "	..."
 [Demo list_geographic_locations with coverage details]
 ```
 
