@@ -521,7 +521,7 @@ def cancel_product_order(order_id):
         return jsonify({
             "id": order_with_details['id'],
             "orderDate": order_with_details['order_date'].isoformat() if order_with_details['order_date'] else None,
-            "state": order_with_details['status'],
+            "status": order_with_details['status'],
             "externalId": order_with_details['external_id'],
             "relatedParty": [{
                 "id": order_with_details['customer_id'],
@@ -650,7 +650,7 @@ def get_single_product_order(order_id):
         return jsonify({
             "id": order['id'],
             "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
-            "state": order['status'],
+            "status": order['status'],
             "externalId": order['external_id'],
             "relatedParty": [{
                 "id": order['customer_id'],
@@ -682,7 +682,7 @@ def update_product_order(order_id):
         new_status = data.get('state') or data.get('status')
         
         if not new_status:
-            return jsonify({"error": "Missing 'state' field in request"}), 400
+            return jsonify({"error": "Missing 'status' field in request"}), 400
         
         # Valid TMF622 order states
         valid_states = ['acknowledged', 'inProgress', 'pending', 'held', 
@@ -690,7 +690,7 @@ def update_product_order(order_id):
         
         if new_status not in valid_states:
             return jsonify({
-                "error": f"Invalid state: {new_status}. Valid states are: {', '.join(valid_states)}"
+                "error": f"Invalid status: {new_status}. Valid values are: {', '.join(valid_states)}"
             }), 400
         
         conn = get_db_connection()
@@ -743,7 +743,7 @@ def update_product_order(order_id):
         return jsonify({
             "id": order_with_details['id'],
             "orderDate": order_with_details['order_date'].isoformat() if order_with_details['order_date'] else None,
-            "state": order_with_details['status'],
+            "status": order_with_details['status'],
             "externalId": order_with_details['external_id'],
             "relatedParty": [{
                 "id": order_with_details['customer_id'],
@@ -865,7 +865,7 @@ def get_product_orders():
                 "id": order['id'],
                 "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
                 "externalId": order['external_id'],
-                "state": order['status'],
+                "status": order['status'],
                 "relatedParty": [{
                     "id": order['customer_id'],
                     "name": order['customer_name'],
@@ -927,7 +927,7 @@ def get_product_order_by_id(order_id):
             "id": order['id'],
             "orderDate": order['order_date'].isoformat() if order['order_date'] else None,
             "externalId": order['external_id'],
-            "state": order['status'],
+            "status": order['status'],
             "relatedParty": [{
                 "id": order['customer_id'],
                 "name": order['customer_name'],
