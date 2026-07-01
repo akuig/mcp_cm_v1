@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS orders (
     order_date DATE NOT NULL,
     external_id VARCHAR(100),
     customer_id VARCHAR(50) REFERENCES customers(id),
-    product_offering_id VARCHAR(50),
+    product_offering_id VARCHAR(50) REFERENCES product_offerings(id),
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS service_activations (
     id VARCHAR(50) PRIMARY KEY,
     service_name VARCHAR(200),
     service_type VARCHAR(50),
-    service_specification_id VARCHAR(50),
+    service_specification_id VARCHAR(50) REFERENCES service_specifications(id),
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

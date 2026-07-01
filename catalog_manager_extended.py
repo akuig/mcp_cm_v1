@@ -10,9 +10,38 @@ from typing import Dict, Optional, List
 import uuid
 from flask import Flask, request, jsonify
 import psycopg2
+from psycopg2 import errors as pg_errors
 from psycopg2.extras import RealDictCursor
 import os
 import json
+
+
+# Map FK constraint name -> (HTTP status, clean error message).
+# Keeps raw Postgres detail (table/column/value) out of API responses.
+FK_VIOLATION_MESSAGES = {
+    'orders_customer_id_fkey': (
+        400,
+        'Invalid customerId: no customer found with this ID'
+    ),
+    'orders_product_offering_id_fkey': (
+        400,
+        'Invalid productOfferingId: no product offering found with this ID'
+    ),
+    'service_activations_service_specification_id_fkey': (
+        400,
+        'Invalid serviceSpecificationId: no service specification found with this ID'
+    ),
+}
+
+
+def _fk_violation_response(exc):
+    """Return (payload, status) for a FK violation, or None if unrecognized."""
+    constraint = getattr(getattr(exc, 'diag', None), 'constraint_name', None)
+    mapped = FK_VIOLATION_MESSAGES.get(constraint)
+    if not mapped:
+        return None
+    status, message = mapped
+    return {"error": message}, status
 
 app = Flask(__name__)
 
@@ -521,17 +550,18 @@ def cancel_product_order(order_id):
 
 def create_product_order():
     """TMF622: Create product order"""
+    conn = None
     try:
         data = request.json
         order_id = str(uuid.uuid4())
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Create order in database
         cursor.execute("""
             INSERT INTO orders (
-                id, order_date, external_id, customer_id, 
+                id, order_date, external_id, customer_id,
                 product_offering_id, status, created_at
             ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING *
@@ -544,9 +574,9 @@ def create_product_order():
             'created',
             datetime.utcnow()
         ))
-        
+
         order = cursor.fetchone()
-        
+
         # Store address information
         address = data['orderItem'][0]['product']['place']
         cursor.execute("""
@@ -559,11 +589,11 @@ def create_product_order():
             address.get('streetName'),
             address.get('city')
         ))
-        
+
         conn.commit()
         cursor.close()
         conn.close()
-        
+
         result = {
             "id": order_id,
             "orderDate": data.get('orderDate'),
@@ -572,10 +602,27 @@ def create_product_order():
             "relatedParty": data.get('relatedParty'),
             "orderItem": data.get('orderItem')
         }
-        
+
         return jsonify(result), 201
-    
+
+    except pg_errors.ForeignKeyViolation as e:
+        if conn is not None:
+            conn.rollback()
+            conn.close()
+        mapped = _fk_violation_response(e)
+        if mapped:
+            payload, status = mapped
+            return jsonify(payload), status
+        logger.error(f"Unmapped FK violation creating order: {e}")
+        return jsonify({"error": "Invalid reference in order"}), 400
+
     except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
         logger.error(f"Error creating order: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
@@ -912,18 +959,19 @@ def get_product_order_by_id(order_id):
 @app.route('/tmf640/serviceActivation', methods=['POST'])
 def activate_service():
     """TMF640: Activate service"""
+    conn = None
     try:
         data = request.json
         service_id = str(uuid.uuid4())
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Create service activation record
         service = data.get('service', {})
         cursor.execute("""
             INSERT INTO service_activations (
-                id, service_name, service_type, 
+                id, service_name, service_type,
                 service_specification_id, status, created_at
             ) VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
@@ -935,9 +983,9 @@ def activate_service():
             'activated',
             datetime.utcnow()
         ))
-        
+
         activation = cursor.fetchone()
-        
+
         # Store address for the activation
         address = service.get('place', {})
         cursor.execute("""
@@ -950,11 +998,11 @@ def activate_service():
             address.get('streetName'),
             address.get('city')
         ))
-        
+
         conn.commit()
         cursor.close()
         conn.close()
-        
+
         result = {
             "id": service_id,
             "service": {
@@ -965,10 +1013,27 @@ def activate_service():
                 "activationDate": datetime.utcnow().isoformat() + "Z"
             }
         }
-        
+
         return jsonify(result), 201
-    
+
+    except pg_errors.ForeignKeyViolation as e:
+        if conn is not None:
+            conn.rollback()
+            conn.close()
+        mapped = _fk_violation_response(e)
+        if mapped:
+            payload, status = mapped
+            return jsonify(payload), status
+        logger.error(f"Unmapped FK violation activating service: {e}")
+        return jsonify({"error": "Invalid reference in service activation"}), 400
+
     except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
         logger.error(f"Error activating service: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
